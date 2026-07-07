@@ -37,3 +37,8 @@ Anchor v2.2 focused on cleaning label artifacts, improving the demo prompts, and
 Stateless chat became the default because the model was trained mostly on single-turn examples. Multi-turn history can confuse the tiny model, so history is off unless explicitly enabled with `/history on`.
 
 Broad curated SFT is not recommended right now for this checkpoint family.
+
+## Anchor v2.3 Local Patch
+
+Anchor v2.3 is a tiny targeted local patch for underfitting wording and CUDA false troubleshooting confusion. It starts from checkpoints/anchor_v2_2_finetuned.pt and writes checkpoints/anchor_v2_3_finetuned.pt. It is not a broad model improvement, and the same small-model limitations still apply.
+

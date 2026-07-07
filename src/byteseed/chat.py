@@ -15,6 +15,15 @@ from .tokenizer import ByteSeedTokenizer
 from .utils import latest_checkpoint
 
 COMMANDS = "/reset  /history [on|off]  /quit  /exit  /temp <val>  /topk <val>  /max <val>  /raw  /help"
+PREFERRED_CHECKPOINTS = (
+    "checkpoints/anchor_v2_3_finetuned.pt",
+    "checkpoints/anchor_v2_2_finetuned.pt",
+    "checkpoints/anchor_v2_1_finetuned.pt",
+    "checkpoints/anchor_v2_finetuned.pt",
+    "checkpoints/anchor_finetuned.pt",
+    "checkpoints/chat_finetuned.pt",
+)
+
 PRESETS = {
     "precise": {"temperature": 0.2, "top_k": 5, "max_new_tokens": 80},
     "balanced": {"temperature": 0.3, "top_k": 8, "max_new_tokens": 120},
@@ -25,6 +34,13 @@ TRAILING_LABEL_PATTERNS = (
     re.compile(r"\s+Command note(?:\s+\d+)?\.?\s*$", re.IGNORECASE),
     re.compile(r"\s+Check\s+\d+\.?\s*$", re.IGNORECASE),
 )
+
+
+def preferred_checkpoint() -> str | None:
+    for checkpoint in PREFERRED_CHECKPOINTS:
+        if Path(checkpoint).exists():
+            return checkpoint
+    return None
 
 
 def parameter_count(model: torch.nn.Module) -> int:
@@ -351,6 +367,8 @@ def main(
 ) -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if default_checkpoint is None:
+        default_checkpoint = preferred_checkpoint()
     parser = build_parser(default_config, default_checkpoint, default_preset)
     args = parser.parse_args(argv)
     run_chat(args)
@@ -358,3 +376,4 @@ def main(
 
 if __name__ == "__main__":
     main()
+

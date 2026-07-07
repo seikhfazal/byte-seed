@@ -6,6 +6,8 @@ ByteSeed is a tiny GPT-style decoder-only Transformer built from scratch in PyTo
 
 Current stable baby assistant checkpoint: `anchor_v2_2`.
 
+Local v0.2 optimization work includes Anchor v2.3, a tiny targeted patch for underfitting wording and CUDA false troubleshooting confusion. It is not a broad model upgrade.
+
 The current stable local checkpoint is:
 
 ```text
@@ -161,4 +163,5 @@ git status
 Confirm that `.venv/`, `checkpoints/`, processed data, runs, logs, and secrets are not staged.
 
 See [docs/REPO_HYGIENE.md](docs/REPO_HYGIENE.md).
+
 
