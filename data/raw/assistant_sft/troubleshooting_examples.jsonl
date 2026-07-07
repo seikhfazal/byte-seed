@@ -1,0 +1,30 @@
+﻿{"user":"CUDA is not available in PyTorch.","assistant":"Send the exact output of python -c \"import torch; print(torch.cuda.is_available()); print(torch.version.cuda)\". Then we can check driver, PyTorch build, and virtual environment."}
+{"user":"CUDA ran out of memory.","assistant":"For ByteSeed-12M on RTX 4050 6GB, lower batch_size first. If it still fails, lower block_size or use ByteSeed-5M."}
+{"user":"My training crashed.","assistant":"Please share the exact traceback, the command you ran, the config file, and whether CUDA was active."}
+{"user":"The smoke test failed.","assistant":"Send the full error output. The common causes are missing dependencies, wrong working directory, or missing tokenizer/data files."}
+{"user":"The tokenizer file is missing.","assistant":"Run python -m src.byteseed.train_tokenizer --config configs/byteseed_12m.yaml from the repo root."}
+{"user":"Processed data is missing.","assistant":"Run tokenizer training first, then python -m src.byteseed.prepare_data --config configs/byteseed_12m.yaml."}
+{"user":"I get ModuleNotFoundError for torch.","assistant":"Activate your virtual environment and run pip install -r requirements.txt. If CUDA matters, install the correct PyTorch CUDA build."}
+{"user":"I get ModuleNotFoundError for datasets.","assistant":"That package is optional. Install it with pip install -r requirements-data.txt only if you want public dataset imports."}
+{"user":"My Windows command does not work.","assistant":"Tell me whether you are using PowerShell, Command Prompt, or Git Bash, and paste the exact command and error."}
+{"user":"My Garuda command does not work.","assistant":"Paste the command, error, and output of pwd. I will avoid destructive suggestions until the path is clear."}
+{"user":"How do I check my current folder on Linux?","assistant":"Run pwd. It prints the current directory and does not modify files."}
+{"user":"How do I list files on Linux?","assistant":"Run ls. It lists files in the current directory and does not modify anything."}
+{"user":"How do I list files on Windows PowerShell?","assistant":"Run Get-ChildItem. It lists files in the current folder and does not modify anything."}
+{"user":"My repo has huge files.","assistant":"Check checkpoints, runs, data/processed, and data/public_imports first. Do not delete anything until you confirm the paths."}
+{"user":"Git wants to commit checkpoints.","assistant":"Check .gitignore and make sure checkpoint patterns are present. If files were already tracked, you need to untrack them carefully without deleting local copies."}
+{"user":"My laptop is slow during training.","assistant":"Check whether CUDA is active. If it is using CPU, training will be much slower. Also close heavy apps and use a short test first."}
+{"user":"The generated text is nonsense.","assistant":"That is expected early. Use more clean data, train longer after validation, and remember ByteSeed-12M is very small."}
+{"user":"The model repeats itself.","assistant":"Try lower max_new_tokens, adjust temperature, add better data, and check whether the dataset is too tiny or repetitive."}
+{"user":"Validation loss is rising.","assistant":"That may be overfitting. Stop the run, add more data, or use shorter training with dropout enabled."}
+{"user":"Training loss is not moving.","assistant":"Check that data is prepared, batches are not empty, learning rate is reasonable, and the model is actually receiving gradients."}
+{"user":"My terminal says access denied.","assistant":"Share the command and path. It may be a permissions issue, a locked file, or a command run from the wrong shell."}
+{"user":"My virtual environment is not active.","assistant":"On Windows PowerShell, run .\\.venv\\Scripts\\activate from the repo root, then check python --version."}
+{"user":"How do I check Python version?","assistant":"Run python --version. ByteSeed targets Python 3.11."}
+{"user":"How do I check NVIDIA GPU name?","assistant":"In Python, run the PyTorch CUDA check. On Windows you can also use nvidia-smi if it is available."}
+{"user":"nvidia-smi is missing.","assistant":"That usually means the NVIDIA tools are not on PATH or the driver install is incomplete. Check the driver first."}
+{"user":"A script overwrote my data.","assistant":"Stop and identify which file changed. Check Git status if available, and avoid running overwrite flags until you understand the script."}
+{"user":"Can I delete data/processed?","assistant":"It is generated data, but confirm the path first. Deleting it means you must run prepare_data.py again."}
+{"user":"Can I delete tokenizer files?","assistant":"You can regenerate them, but deleting tokenizer model files means prepared data and checkpoints may no longer match."}
+{"user":"Public import seems risky.","assistant":"Use a small limit, inspect the output, check license notes, and do not commit imported public data blindly."}
+{"user":"I do not know what error to send.","assistant":"Send the command you ran, the full traceback or error text, your config file name, and whether you are on Windows or Garuda Linux."}

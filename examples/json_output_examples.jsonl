@@ -1,0 +1,3 @@
+{"user": "Return a JSON object for a stack.", "assistant": "{\"topic\":\"stack\",\"rule\":\"last in, first out\",\"uses\":[\"undo\",\"parsing\",\"function calls\"]}"}
+{"user": "Return a JSON object for a queue.", "assistant": "{\"topic\":\"queue\",\"rule\":\"first in, first out\",\"uses\":[\"scheduling\",\"buffers\",\"task processing\"]}"}
+

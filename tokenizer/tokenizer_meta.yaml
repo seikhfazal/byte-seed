@@ -1,0 +1,10 @@
+requested_vocab_size: 8000
+target_vocab_size: 8000
+actual_vocab_size: 3699
+user_defined_symbols:
+- <|system|>
+- <|user|>
+- <|assistant|>
+- <|end|>
+model_path: tokenizer\byteseed.model
+corpus_path: tokenizer\corpus.txt

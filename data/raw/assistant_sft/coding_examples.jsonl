@@ -1,0 +1,30 @@
+﻿{"user":"How should you help me change code?","assistant":"I should name the file or function first, then provide the code and explain how to verify it."}
+{"user":"My Python script cannot import byteseed.","assistant":"Run it from the repo root or install the package in editable mode. Also check that the src folder exists and your virtual environment is active."}
+{"user":"What file handles ByteSeed configs?","assistant":"The config loader is in src/byteseed/config.py. Change that file if you need new config fields."}
+{"user":"What file contains the Transformer model?","assistant":"The model is implemented in src/byteseed/model.py."}
+{"user":"Where should tokenizer helper code go?","assistant":"Tokenizer loading and encode/decode helpers belong in src/byteseed/tokenizer.py."}
+{"user":"How do I count model parameters?","assistant":"Run python scripts/count_params.py --config configs/byteseed_12m.yaml from the repo root."}
+{"user":"How do I run the smoke test?","assistant":"Run python scripts/smoke_test.py from the repo root. It should stay short and should not start full training."}
+{"user":"How do I do a short training test?","assistant":"Use python -m src.byteseed.pretrain --config configs/byteseed_12m.yaml --max-iters 100 and inspect the output before training longer."}
+{"user":"How do I train the tokenizer?","assistant":"Run python -m src.byteseed.train_tokenizer --config configs/byteseed_12m.yaml after adding Markdown files to data/raw."}
+{"user":"How do I prepare data?","assistant":"Run python -m src.byteseed.prepare_data --config configs/byteseed_12m.yaml after tokenizer training finishes."}
+{"user":"What should I commit to GitHub?","assistant":"Commit code, configs, docs, sample data, and small generic examples. Do not commit checkpoints, processed arrays, runs, or private notes."}
+{"user":"What should go in .gitignore?","assistant":"Ignore virtual environments, caches, checkpoints, processed data, tokenizer model files, and large imported dataset formats."}
+{"user":"Explain a safe PowerShell command.","assistant":"A safe first command is Get-ChildItem. It lists files in the current folder and does not modify anything."}
+{"user":"Explain a risky command.","assistant":"Remove-Item can delete files. Before using it, check the path carefully and avoid recursive deletion unless you are certain."}
+{"user":"How do I compile a C file with warnings?","assistant":"Use gcc -Wall -Wextra main.c -o main. Warnings help catch common mistakes before runtime."}
+{"user":"What should I check for a C pointer bug?","assistant":"Check whether the pointer is initialized, still valid, within bounds, and not freed before use."}
+{"user":"How should I debug a Python traceback?","assistant":"Start at the bottom line for the exception type, then inspect the file and line number where your code failed."}
+{"user":"How do I write cleaner Python?","assistant":"Use clear names, small functions, simple control flow, and error messages that explain what the user should do next."}
+{"user":"Where should new dataset scripts go?","assistant":"Put small repo utilities in scripts/. Keep reusable package logic under src/byteseed/."}
+{"user":"What is a good commit message?","assistant":"Use a short imperative message like add personal assistant dataset scripts."}
+{"user":"How do I avoid breaking the repo?","assistant":"Make small changes, run compileall or smoke tests, and inspect generated files before committing."}
+{"user":"What if a dependency is optional?","assistant":"Put optional data tooling in requirements-data.txt instead of the main requirements.txt."}
+{"user":"Should ByteSeed use Hugging Face Transformers?","assistant":"No. ByteSeed manually implements the Transformer in PyTorch for learning."}
+{"user":"Can ByteSeed use Hugging Face datasets?","assistant":"Only for optional dataset import scripts. The core model should not depend on it."}
+{"user":"How should generated public data be stored?","assistant":"Store optional imported data under data/public_imports and avoid committing it blindly."}
+{"user":"What is a JSONL file?","assistant":"JSONL stores one JSON object per line. It is convenient for chat examples and streaming data."}
+{"user":"How do I format chat SFT?","assistant":"Use user and assistant fields, then convert them to <|user|> and <|assistant|> prompt text during dataset building."}
+{"user":"How do I handle file overwrite risk?","assistant":"Refuse to overwrite by default and require an explicit overwrite flag for generated outputs."}
+{"user":"What should a validation script print?","assistant":"It should print counts, rough size estimates, shortest and longest examples, and warnings about tiny data or secrets."}
+{"user":"How do I explain a code change?","assistant":"State the changed file, why the change exists, how to run it, and any remaining limitation."}

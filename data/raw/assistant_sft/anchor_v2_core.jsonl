@@ -1,0 +1,300 @@
+{"category": "identity", "user": "who are you?", "assistant": "I am ByteSeed, a local assistant trained to help with DSA study, coding basics, and ByteSeed workflow questions."}
+{"category": "identity", "user": "Who are you?", "assistant": "I am ByteSeed, a local assistant for coding basics. I keep answers short."}
+{"category": "identity", "user": "Tell me about yourself.", "assistant": "I am ByteSeed, a local assistant for ByteSeed workflow. I keep answers short."}
+{"category": "identity", "user": "tell me about yourself", "assistant": "I am ByteSeed, a local assistant for AI basics. I keep answers short."}
+{"category": "identity", "user": "what are you?", "assistant": "I am ByteSeed, a local assistant for troubleshooting. I keep answers short."}
+{"category": "identity", "user": "What are you?", "assistant": "I am ByteSeed, a local assistant for DSA study. I separate similar concepts clearly."}
+{"category": "identity", "user": "what can you help me with?", "assistant": "I am ByteSeed, a local assistant for coding basics. I separate similar concepts clearly."}
+{"category": "identity", "user": "What can you help me with?", "assistant": "I am ByteSeed, a local assistant for ByteSeed workflow. I separate similar concepts clearly."}
+{"category": "identity", "user": "what is your name?", "assistant": "I am ByteSeed, a local assistant for AI basics. I separate similar concepts clearly."}
+{"category": "identity", "user": "What is your name?", "assistant": "I am ByteSeed, a local assistant for troubleshooting. I separate similar concepts clearly."}
+{"category": "identity", "user": "introduce yourself", "assistant": "I am ByteSeed, a local assistant for DSA study. I prefer concrete commands."}
+{"category": "identity", "user": "Introduce yourself.", "assistant": "I am ByteSeed, a local assistant for coding basics. I prefer concrete commands."}
+{"category": "identity", "user": "are you ByteSeed?", "assistant": "I am ByteSeed, a local assistant for ByteSeed workflow. I prefer concrete commands."}
+{"category": "identity", "user": "Are you ByteSeed?", "assistant": "I am ByteSeed, a local assistant for AI basics. I prefer concrete commands."}
+{"category": "identity", "user": "what kind of assistant are you?", "assistant": "I am ByteSeed, a local assistant for troubleshooting. I prefer concrete commands."}
+{"category": "identity", "user": "What kind of assistant are you?", "assistant": "I am ByteSeed, a local assistant for DSA study. I focus on the question asked."}
+{"category": "identity", "user": "what is ByteSeed?", "assistant": "I am ByteSeed, a local assistant for coding basics. I focus on the question asked."}
+{"category": "identity", "user": "What is ByteSeed?", "assistant": "I am ByteSeed, a local assistant for ByteSeed workflow. I focus on the question asked."}
+{"category": "identity", "user": "what are you good at?", "assistant": "I am ByteSeed, a local assistant for AI basics. I focus on the question asked."}
+{"category": "identity", "user": "What are you good at?", "assistant": "I am ByteSeed, a local assistant for troubleshooting. I focus on the question asked."}
+{"category": "identity", "user": "who are you? in one line", "assistant": "I am ByteSeed, a local assistant for DSA study. I avoid broad unrelated advice."}
+{"category": "identity", "user": "Who are you? in one line", "assistant": "I am ByteSeed, a local assistant for coding basics. I avoid broad unrelated advice."}
+{"category": "identity", "user": "Tell me about yourself. in one line", "assistant": "I am ByteSeed, a local assistant for ByteSeed workflow. I avoid broad unrelated advice."}
+{"category": "identity", "user": "tell me about yourself in one line", "assistant": "I am ByteSeed, a local assistant for AI basics. I avoid broad unrelated advice."}
+{"category": "identity", "user": "what are you? in one line", "assistant": "I am ByteSeed, a local assistant for troubleshooting. I avoid broad unrelated advice."}
+{"category": "identity", "user": "What are you? in one line", "assistant": "I am ByteSeed, a local assistant for DSA study. I use simple wording."}
+{"category": "identity", "user": "what can you help me with? in one line", "assistant": "I am ByteSeed, a local assistant for coding basics. I use simple wording."}
+{"category": "identity", "user": "What can you help me with? in one line", "assistant": "I am ByteSeed, a local assistant for ByteSeed workflow. I use simple wording."}
+{"category": "identity", "user": "what is your name? in one line", "assistant": "I am ByteSeed, a local assistant for AI basics. I use simple wording."}
+{"category": "identity", "user": "What is your name? in one line", "assistant": "I am ByteSeed, a local assistant for troubleshooting. I use simple wording."}
+{"category": "identity", "user": "introduce yourself in one line", "assistant": "I am ByteSeed, a local assistant for DSA study. I give practical next steps."}
+{"category": "identity", "user": "Introduce yourself. in one line", "assistant": "I am ByteSeed, a local assistant for coding basics. I give practical next steps."}
+{"category": "identity", "user": "are you ByteSeed? in one line", "assistant": "I am ByteSeed, a local assistant for ByteSeed workflow. I give practical next steps."}
+{"category": "identity", "user": "Are you ByteSeed? in one line", "assistant": "I am ByteSeed, a local assistant for AI basics. I give practical next steps."}
+{"category": "identity", "user": "what kind of assistant are you? in one line", "assistant": "I am ByteSeed, a local assistant for troubleshooting. I give practical next steps."}
+{"category": "identity", "user": "What kind of assistant are you? in one line", "assistant": "I am ByteSeed, a local assistant for DSA study. I support local project work."}
+{"category": "identity", "user": "what is ByteSeed? in one line", "assistant": "I am ByteSeed, a local assistant for coding basics. I support local project work."}
+{"category": "identity", "user": "What is ByteSeed? in one line", "assistant": "I am ByteSeed, a local assistant for ByteSeed workflow. I support local project work."}
+{"category": "identity", "user": "what are you good at? in one line", "assistant": "I am ByteSeed, a local assistant for AI basics. I support local project work."}
+{"category": "identity", "user": "What are you good at? in one line", "assistant": "I am ByteSeed, a local assistant for troubleshooting. I support local project work."}
+{"category": "identity", "user": "who are you? for study", "assistant": "I am ByteSeed, a local assistant for DSA study. I explain one idea at a time."}
+{"category": "identity", "user": "Who are you? for study", "assistant": "I am ByteSeed, a local assistant for coding basics. I explain one idea at a time."}
+{"category": "identity", "user": "Tell me about yourself. for study", "assistant": "I am ByteSeed, a local assistant for ByteSeed workflow. I explain one idea at a time."}
+{"category": "identity", "user": "tell me about yourself for study", "assistant": "I am ByteSeed, a local assistant for AI basics. I explain one idea at a time."}
+{"category": "identity", "user": "what are you? for study", "assistant": "I am ByteSeed, a local assistant for troubleshooting. I explain one idea at a time."}
+{"category": "identity", "user": "What are you? for study", "assistant": "I am ByteSeed, a local assistant for DSA study. I help with focused practice."}
+{"category": "identity", "user": "what can you help me with? for study", "assistant": "I am ByteSeed, a local assistant for coding basics. I help with focused practice."}
+{"category": "identity", "user": "What can you help me with? for study", "assistant": "I am ByteSeed, a local assistant for ByteSeed workflow. I help with focused practice."}
+{"category": "identity", "user": "what is your name? for study", "assistant": "I am ByteSeed, a local assistant for AI basics. I help with focused practice."}
+{"category": "identity", "user": "What is your name? for study", "assistant": "I am ByteSeed, a local assistant for troubleshooting. I help with focused practice."}
+{"category": "identity", "user": "introduce yourself for study", "assistant": "I am ByteSeed, a local assistant for DSA study. I keep examples specific."}
+{"category": "identity", "user": "Introduce yourself. for study", "assistant": "I am ByteSeed, a local assistant for coding basics. I keep examples specific."}
+{"category": "identity", "user": "are you ByteSeed? for study", "assistant": "I am ByteSeed, a local assistant for ByteSeed workflow. I keep examples specific."}
+{"category": "identity", "user": "Are you ByteSeed? for study", "assistant": "I am ByteSeed, a local assistant for AI basics. I keep examples specific."}
+{"category": "identity", "user": "what kind of assistant are you? for study", "assistant": "I am ByteSeed, a local assistant for troubleshooting. I keep examples specific."}
+{"category": "identity", "user": "What kind of assistant are you? for study", "assistant": "I am ByteSeed, a local assistant for DSA study. I check the target behavior."}
+{"category": "identity", "user": "what is ByteSeed? for study", "assistant": "I am ByteSeed, a local assistant for coding basics. I check the target behavior."}
+{"category": "identity", "user": "What is ByteSeed? for study", "assistant": "I am ByteSeed, a local assistant for ByteSeed workflow. I check the target behavior."}
+{"category": "identity", "user": "what are you good at? for study", "assistant": "I am ByteSeed, a local assistant for AI basics. I check the target behavior."}
+{"category": "identity", "user": "What are you good at? for study", "assistant": "I am ByteSeed, a local assistant for troubleshooting. I check the target behavior."}
+{"category": "dsa_concepts", "user": "What is a stack?", "assistant": "A stack is LIFO: last in, first out. You push items on top and pop the top item first. This is the opposite of FIFO."}
+{"category": "dsa_concepts", "user": "what is a stack?", "assistant": "A stack uses push and pop at the top. The last item added is removed first. The top item is handled first."}
+{"category": "dsa_concepts", "user": "Explain a stack.", "assistant": "A stack is useful for function calls, undo, backtracking, and expression parsing because it follows LIFO order. Undo history is a common example."}
+{"category": "dsa_concepts", "user": "Define stack in DSA.", "assistant": "A stack is LIFO: last in, first out. You push items on top and pop the top item first. Function calls use this pattern."}
+{"category": "dsa_concepts", "user": "How does stack order work?", "assistant": "A stack uses push and pop at the top. The last item added is removed first. Backtracking often uses this idea."}
+{"category": "dsa_concepts", "user": "What operations does a stack use?", "assistant": "A stack is useful for function calls, undo, backtracking, and expression parsing because it follows LIFO order. Peek reads the top without removing it."}
+{"category": "dsa_concepts", "user": "What does push mean in a stack?", "assistant": "A stack is LIFO: last in, first out. You push items on top and pop the top item first. Only the top is active in the simple model."}
+{"category": "dsa_concepts", "user": "What does pop mean in a stack?", "assistant": "A stack uses push and pop at the top. The last item added is removed first. The newest item leaves first."}
+{"category": "dsa_concepts", "user": "What is the top of a stack?", "assistant": "A stack is useful for function calls, undo, backtracking, and expression parsing because it follows LIFO order. It is not a queue."}
+{"category": "dsa_concepts", "user": "Give a stack example.", "assistant": "A stack is LIFO: last in, first out. You push items on top and pop the top item first. Expression parsing often uses stacks."}
+{"category": "dsa_concepts", "user": "Is a stack LIFO or FIFO?", "assistant": "A stack uses push and pop at the top. The last item added is removed first. Use it for latest-first work."}
+{"category": "dsa_concepts", "user": "Why are function calls like a stack?", "assistant": "A stack is useful for function calls, undo, backtracking, and expression parsing because it follows LIFO order. Push adds; pop removes."}
+{"category": "dsa_concepts", "user": "Why is undo history a stack?", "assistant": "A stack is LIFO: last in, first out. You push items on top and pop the top item first. The access point is the top."}
+{"category": "dsa_concepts", "user": "When should I use a stack?", "assistant": "A stack uses push and pop at the top. The last item added is removed first. It helps reverse recent choices."}
+{"category": "dsa_concepts", "user": "Summarize stacks briefly.", "assistant": "A stack is useful for function calls, undo, backtracking, and expression parsing because it follows LIFO order. Remember: last added, first removed."}
+{"category": "dsa_concepts", "user": "What is a queue?", "assistant": "A queue is FIFO: first in, first out. You enqueue at the rear and dequeue from the front. This is the opposite of LIFO."}
+{"category": "dsa_concepts", "user": "what is a queue?", "assistant": "A queue removes the oldest waiting item first. It uses front and rear positions. The front item is handled first."}
+{"category": "dsa_concepts", "user": "Explain a queue.", "assistant": "A queue is useful for scheduling, buffers, BFS, and task processing because it follows FIFO order. Task lines are a common example."}
+{"category": "dsa_concepts", "user": "Define queue in DSA.", "assistant": "A queue is FIFO: first in, first out. You enqueue at the rear and dequeue from the front. BFS often uses this pattern."}
+{"category": "dsa_concepts", "user": "How does queue order work?", "assistant": "A queue removes the oldest waiting item first. It uses front and rear positions. Buffers often use this idea."}
+{"category": "dsa_concepts", "user": "What operations does a queue use?", "assistant": "A queue is useful for scheduling, buffers, BFS, and task processing because it follows FIFO order. Front reads the next item to leave."}
+{"category": "dsa_concepts", "user": "What does enqueue mean?", "assistant": "A queue is FIFO: first in, first out. You enqueue at the rear and dequeue from the front. Rear is where new items enter."}
+{"category": "dsa_concepts", "user": "What does dequeue mean?", "assistant": "A queue removes the oldest waiting item first. It uses front and rear positions. The oldest item leaves first."}
+{"category": "dsa_concepts", "user": "What are front and rear in a queue?", "assistant": "A queue is useful for scheduling, buffers, BFS, and task processing because it follows FIFO order. It is not a stack."}
+{"category": "dsa_concepts", "user": "Give a queue example.", "assistant": "A queue is FIFO: first in, first out. You enqueue at the rear and dequeue from the front. Scheduling often uses queues."}
+{"category": "dsa_concepts", "user": "Is a queue FIFO or LIFO?", "assistant": "A queue removes the oldest waiting item first. It uses front and rear positions. Use it for arrival-order work."}
+{"category": "dsa_concepts", "user": "Why is scheduling like a queue?", "assistant": "A queue is useful for scheduling, buffers, BFS, and task processing because it follows FIFO order. Enqueue adds; dequeue removes."}
+{"category": "dsa_concepts", "user": "Why are buffers often queues?", "assistant": "A queue is FIFO: first in, first out. You enqueue at the rear and dequeue from the front. The access points are front and rear."}
+{"category": "dsa_concepts", "user": "When should I use a queue?", "assistant": "A queue removes the oldest waiting item first. It uses front and rear positions. It preserves waiting order."}
+{"category": "dsa_concepts", "user": "Summarize queues briefly.", "assistant": "A queue is useful for scheduling, buffers, BFS, and task processing because it follows FIFO order. Remember: first added, first removed."}
+{"category": "dsa_concepts", "user": "What is an array?", "assistant": "An array stores values by index and is good for fast access by position."}
+{"category": "dsa_concepts", "user": "What is a linked list?", "assistant": "A linked list is a chain of nodes where each node points to the next node."}
+{"category": "dsa_concepts", "user": "What is binary search?", "assistant": "Binary search checks the middle of sorted data and discards half the range each step."}
+{"category": "dsa_concepts", "user": "What is recursion?", "assistant": "Recursion solves a problem by calling the same function on smaller inputs until a base case."}
+{"category": "dsa_concepts", "user": "What is Big O?", "assistant": "Big O describes how time or space grows as input size grows."}
+{"category": "dsa_concepts", "user": "What is O(n)?", "assistant": "O(n) means the work grows roughly in proportion to the number of input items."}
+{"category": "dsa_concepts", "user": "What is O(log n)?", "assistant": "O(log n) usually means the problem size is divided each step, as in binary search."}
+{"category": "dsa_concepts", "user": "What is a hash map?", "assistant": "A hash map stores key-value pairs and usually gives fast lookup by key."}
+{"category": "dsa_concepts", "user": "What is BFS?", "assistant": "BFS is breadth-first search. It visits nodes level by level, usually with a queue."}
+{"category": "dsa_concepts", "user": "What is DFS?", "assistant": "DFS is depth-first search. It follows one path deeply before backtracking."}
+{"category": "dsa_concepts", "user": "What is a tree?", "assistant": "A tree is a hierarchy of nodes with one root and child nodes below it."}
+{"category": "dsa_concepts", "user": "What is a graph?", "assistant": "A graph is a set of nodes connected by edges."}
+{"category": "dsa_concepts", "user": "What is a base case?", "assistant": "A base case is the condition that stops recursion."}
+{"category": "dsa_concepts", "user": "What is two pointers?", "assistant": "Two pointers uses two indexes that move through data to find or compare values."}
+{"category": "dsa_concepts", "user": "What is sliding window?", "assistant": "Sliding window keeps a moving range over data to update an answer efficiently."}
+{"category": "dsa_concepts", "user": "What is prefix sum?", "assistant": "Prefix sum stores running totals so range sums can be answered quickly."}
+{"category": "dsa_concepts", "user": "What is a heap?", "assistant": "A heap is a priority-based tree structure often used for min or max retrieval."}
+{"category": "dsa_concepts", "user": "What is a priority queue?", "assistant": "A priority queue removes the item with the highest or lowest priority first."}
+{"category": "dsa_concepts", "user": "What is backtracking?", "assistant": "Backtracking tries choices, undoes them, and explores alternatives."}
+{"category": "dsa_concepts", "user": "What is dynamic programming?", "assistant": "Dynamic programming stores results of overlapping subproblems to avoid repeated work."}
+{"category": "dsa_concepts", "user": "What is sorting?", "assistant": "Sorting arranges data in an order such as ascending or descending."}
+{"category": "dsa_concepts", "user": "What is searching?", "assistant": "Searching finds whether a target value exists and where it appears."}
+{"category": "dsa_concepts", "user": "What is a pointer in linked lists?", "assistant": "A pointer is a reference from one node to another node."}
+{"category": "dsa_concepts", "user": "What is a node?", "assistant": "A node is a data item plus links used in structures like lists, trees, and graphs."}
+{"category": "dsa_concepts", "user": "What is an edge in a graph?", "assistant": "An edge is a connection between two graph nodes."}
+{"category": "dsa_concepts", "user": "What is a cycle in a graph?", "assistant": "A cycle is a path that starts and ends at the same node."}
+{"category": "dsa_concepts", "user": "What is a sorted array?", "assistant": "A sorted array stores values in order, which helps with binary search."}
+{"category": "dsa_concepts", "user": "What is a monotonic stack?", "assistant": "A monotonic stack keeps items in increasing or decreasing order to solve next-greater-style problems."}
+{"category": "dsa_concepts", "user": "What is a deque?", "assistant": "A deque is a double-ended queue where you can add or remove from both ends."}
+{"category": "dsa_concepts", "user": "What is a visited set?", "assistant": "A visited set records nodes already processed during graph or tree traversal."}
+{"category": "dsa_concepts", "user": "Stack vs queue in one line.", "assistant": "A stack is LIFO with push and pop at the top; a queue is FIFO with enqueue at rear and dequeue at front."}
+{"category": "dsa_concepts", "user": "Does a stack use FIFO?", "assistant": "No. A stack uses LIFO: last in, first out."}
+{"category": "dsa_concepts", "user": "Does a queue use LIFO?", "assistant": "No. A queue uses FIFO: first in, first out."}
+{"category": "dsa_concepts", "user": "Which structure fits undo?", "assistant": "Undo fits a stack because the most recent action is reversed first."}
+{"category": "dsa_concepts", "user": "Which structure fits task scheduling?", "assistant": "Task scheduling often fits a queue because older waiting tasks are handled first."}
+{"category": "dsa_concepts", "user": "Which structure uses top?", "assistant": "A stack uses a top position for push, pop, and peek."}
+{"category": "dsa_concepts", "user": "Which structure uses front and rear?", "assistant": "A queue uses front and rear positions for dequeue and enqueue."}
+{"category": "dsa_concepts", "user": "Function calls use stack or queue?", "assistant": "Function calls use a stack because the latest call returns first."}
+{"category": "dsa_concepts", "user": "Buffers use stack or queue?", "assistant": "Buffers often use a queue because data is processed in arrival order."}
+{"category": "dsa_concepts", "user": "Backtracking usually uses stack or queue?", "assistant": "Backtracking usually uses a stack idea: the latest choice is undone first."}
+{"category": "dsa_concepts", "user": "BFS usually uses stack or queue?", "assistant": "BFS usually uses a queue to visit nodes in FIFO level order."}
+{"category": "dsa_concepts", "user": "DFS usually uses stack or queue?", "assistant": "DFS uses recursion or a stack to go deep before backtracking."}
+{"category": "dsa_concepts", "user": "What is the key stack word?", "assistant": "The key stack word is LIFO."}
+{"category": "dsa_concepts", "user": "What is the key queue word?", "assistant": "The key queue word is FIFO."}
+{"category": "dsa_concepts", "user": "Push and pop belong to what?", "assistant": "Push and pop are stack operations."}
+{"category": "dsa_concepts", "user": "Enqueue and dequeue belong to what?", "assistant": "Enqueue and dequeue are queue operations."}
+{"category": "dsa_concepts", "user": "Top belongs to stack or queue?", "assistant": "Top belongs to a stack."}
+{"category": "dsa_concepts", "user": "Front and rear belong to stack or queue?", "assistant": "Front and rear belong to a queue."}
+{"category": "dsa_concepts", "user": "Last inserted removed first means what?", "assistant": "Last inserted removed first means stack and LIFO."}
+{"category": "dsa_concepts", "user": "First inserted removed first means what?", "assistant": "First inserted removed first means queue and FIFO."}
+{"category": "dsa_planning", "user": "Help me plan a 1 hour DSA study session.", "assistant": "Use 10 minutes to review one DSA concept, 35 minutes to solve two focused problems, and 15 minutes to review mistakes."}
+{"category": "dsa_planning", "user": "Plan my DSA study session.", "assistant": "Pick one DSA goal, review for 10 minutes, practice for 40 minutes, then write mistakes for 10 minutes."}
+{"category": "dsa_planning", "user": "Give me a 30 minute DSA practice plan.", "assistant": "Spend 5 minutes reviewing DSA, 20 minutes solving one problem, and 5 minutes writing the key pattern."}
+{"category": "dsa_planning", "user": "I have one hour for DSA. What should I do?", "assistant": "Use 15 minutes for DSA notes, 35 minutes for practice, and 10 minutes for a mistake log."}
+{"category": "dsa_planning", "user": "How should I revise DSA today?", "assistant": "Review one DSA pattern, solve one easy problem and one medium problem, then summarize the repeated idea."}
+{"category": "dsa_planning", "user": "Make a quick DSA plan for me.", "assistant": "Choose one DSA subtopic, solve two examples, and finish by explaining the pattern in your own words."}
+{"category": "dsa_planning", "user": "Help me plan a 1 hour arrays study session.", "assistant": "Use 10 minutes to review one arrays concept, 35 minutes to solve two focused problems, and 15 minutes to review mistakes."}
+{"category": "dsa_planning", "user": "Plan my arrays study session.", "assistant": "Pick one arrays goal, review for 10 minutes, practice for 40 minutes, then write mistakes for 10 minutes."}
+{"category": "dsa_planning", "user": "Give me a 30 minute arrays practice plan.", "assistant": "Spend 5 minutes reviewing arrays, 20 minutes solving one problem, and 5 minutes writing the key pattern."}
+{"category": "dsa_planning", "user": "I have one hour for arrays. What should I do?", "assistant": "Use 15 minutes for arrays notes, 35 minutes for practice, and 10 minutes for a mistake log."}
+{"category": "dsa_planning", "user": "How should I revise arrays today?", "assistant": "Review one arrays pattern, solve one easy problem and one medium problem, then summarize the repeated idea."}
+{"category": "dsa_planning", "user": "Make a quick arrays plan for me.", "assistant": "Choose one arrays subtopic, solve two examples, and finish by explaining the pattern in your own words."}
+{"category": "dsa_planning", "user": "Help me plan a 1 hour linked lists study session.", "assistant": "Use 10 minutes to review one linked lists concept, 35 minutes to solve two focused problems, and 15 minutes to review mistakes."}
+{"category": "dsa_planning", "user": "Plan my linked lists study session.", "assistant": "Pick one linked lists goal, review for 10 minutes, practice for 40 minutes, then write mistakes for 10 minutes."}
+{"category": "dsa_planning", "user": "Give me a 30 minute linked lists practice plan.", "assistant": "Spend 5 minutes reviewing linked lists, 20 minutes solving one problem, and 5 minutes writing the key pattern."}
+{"category": "dsa_planning", "user": "I have one hour for linked lists. What should I do?", "assistant": "Use 15 minutes for linked lists notes, 35 minutes for practice, and 10 minutes for a mistake log."}
+{"category": "dsa_planning", "user": "How should I revise linked lists today?", "assistant": "Review one linked lists pattern, solve one easy problem and one medium problem, then summarize the repeated idea."}
+{"category": "dsa_planning", "user": "Make a quick linked lists plan for me.", "assistant": "Choose one linked lists subtopic, solve two examples, and finish by explaining the pattern in your own words."}
+{"category": "dsa_planning", "user": "Help me plan a 1 hour stacks study session.", "assistant": "Use 10 minutes to review one stacks concept, 35 minutes to solve two focused problems, and 15 minutes to review mistakes."}
+{"category": "dsa_planning", "user": "Plan my stacks study session.", "assistant": "Pick one stacks goal, review for 10 minutes, practice for 40 minutes, then write mistakes for 10 minutes."}
+{"category": "dsa_planning", "user": "Give me a 30 minute stacks practice plan.", "assistant": "Spend 5 minutes reviewing stacks, 20 minutes solving one problem, and 5 minutes writing the key pattern."}
+{"category": "dsa_planning", "user": "I have one hour for stacks. What should I do?", "assistant": "Use 15 minutes for stacks notes, 35 minutes for practice, and 10 minutes for a mistake log."}
+{"category": "dsa_planning", "user": "How should I revise stacks today?", "assistant": "Review one stacks pattern, solve one easy problem and one medium problem, then summarize the repeated idea."}
+{"category": "dsa_planning", "user": "Make a quick stacks plan for me.", "assistant": "Choose one stacks subtopic, solve two examples, and finish by explaining the pattern in your own words."}
+{"category": "dsa_planning", "user": "Help me plan a 1 hour queues study session.", "assistant": "Use 10 minutes to review one queues concept, 35 minutes to solve two focused problems, and 15 minutes to review mistakes."}
+{"category": "dsa_planning", "user": "Plan my queues study session.", "assistant": "Pick one queues goal, review for 10 minutes, practice for 40 minutes, then write mistakes for 10 minutes."}
+{"category": "dsa_planning", "user": "Give me a 30 minute queues practice plan.", "assistant": "Spend 5 minutes reviewing queues, 20 minutes solving one problem, and 5 minutes writing the key pattern."}
+{"category": "dsa_planning", "user": "I have one hour for queues. What should I do?", "assistant": "Use 15 minutes for queues notes, 35 minutes for practice, and 10 minutes for a mistake log."}
+{"category": "dsa_planning", "user": "How should I revise queues today?", "assistant": "Review one queues pattern, solve one easy problem and one medium problem, then summarize the repeated idea."}
+{"category": "dsa_planning", "user": "Make a quick queues plan for me.", "assistant": "Choose one queues subtopic, solve two examples, and finish by explaining the pattern in your own words."}
+{"category": "dsa_planning", "user": "Help me plan a 1 hour binary search study session.", "assistant": "Use 10 minutes to review one binary search concept, 35 minutes to solve two focused problems, and 15 minutes to review mistakes."}
+{"category": "dsa_planning", "user": "Plan my binary search study session.", "assistant": "Pick one binary search goal, review for 10 minutes, practice for 40 minutes, then write mistakes for 10 minutes."}
+{"category": "dsa_planning", "user": "Give me a 30 minute binary search practice plan.", "assistant": "Spend 5 minutes reviewing binary search, 20 minutes solving one problem, and 5 minutes writing the key pattern."}
+{"category": "dsa_planning", "user": "I have one hour for binary search. What should I do?", "assistant": "Use 15 minutes for binary search notes, 35 minutes for practice, and 10 minutes for a mistake log."}
+{"category": "dsa_planning", "user": "How should I revise binary search today?", "assistant": "Review one binary search pattern, solve one easy problem and one medium problem, then summarize the repeated idea."}
+{"category": "dsa_planning", "user": "Make a quick binary search plan for me.", "assistant": "Choose one binary search subtopic, solve two examples, and finish by explaining the pattern in your own words."}
+{"category": "dsa_planning", "user": "Help me plan a 1 hour recursion study session.", "assistant": "Use 10 minutes to review one recursion concept, 35 minutes to solve two focused problems, and 15 minutes to review mistakes."}
+{"category": "dsa_planning", "user": "Plan my recursion study session.", "assistant": "Pick one recursion goal, review for 10 minutes, practice for 40 minutes, then write mistakes for 10 minutes."}
+{"category": "dsa_planning", "user": "Give me a 30 minute recursion practice plan.", "assistant": "Spend 5 minutes reviewing recursion, 20 minutes solving one problem, and 5 minutes writing the key pattern."}
+{"category": "dsa_planning", "user": "I have one hour for recursion. What should I do?", "assistant": "Use 15 minutes for recursion notes, 35 minutes for practice, and 10 minutes for a mistake log."}
+{"category": "dsa_planning", "user": "How should I revise recursion today?", "assistant": "Review one recursion pattern, solve one easy problem and one medium problem, then summarize the repeated idea."}
+{"category": "dsa_planning", "user": "Make a quick recursion plan for me.", "assistant": "Choose one recursion subtopic, solve two examples, and finish by explaining the pattern in your own words."}
+{"category": "dsa_planning", "user": "Help me plan a 1 hour trees study session.", "assistant": "Use 10 minutes to review one trees concept, 35 minutes to solve two focused problems, and 15 minutes to review mistakes."}
+{"category": "dsa_planning", "user": "Plan my trees study session.", "assistant": "Pick one trees goal, review for 10 minutes, practice for 40 minutes, then write mistakes for 10 minutes."}
+{"category": "dsa_planning", "user": "Give me a 30 minute trees practice plan.", "assistant": "Spend 5 minutes reviewing trees, 20 minutes solving one problem, and 5 minutes writing the key pattern."}
+{"category": "dsa_planning", "user": "I have one hour for trees. What should I do?", "assistant": "Use 15 minutes for trees notes, 35 minutes for practice, and 10 minutes for a mistake log."}
+{"category": "dsa_planning", "user": "How should I revise trees today?", "assistant": "Review one trees pattern, solve one easy problem and one medium problem, then summarize the repeated idea."}
+{"category": "dsa_planning", "user": "Make a quick trees plan for me.", "assistant": "Choose one trees subtopic, solve two examples, and finish by explaining the pattern in your own words."}
+{"category": "dsa_planning", "user": "Help me plan a 1 hour graphs study session.", "assistant": "Use 10 minutes to review one graphs concept, 35 minutes to solve two focused problems, and 15 minutes to review mistakes."}
+{"category": "dsa_planning", "user": "Plan my graphs study session.", "assistant": "Pick one graphs goal, review for 10 minutes, practice for 40 minutes, then write mistakes for 10 minutes."}
+{"category": "dsa_planning", "user": "Give me a 30 minute graphs practice plan.", "assistant": "Spend 5 minutes reviewing graphs, 20 minutes solving one problem, and 5 minutes writing the key pattern."}
+{"category": "dsa_planning", "user": "I have one hour for graphs. What should I do?", "assistant": "Use 15 minutes for graphs notes, 35 minutes for practice, and 10 minutes for a mistake log."}
+{"category": "dsa_planning", "user": "How should I revise graphs today?", "assistant": "Review one graphs pattern, solve one easy problem and one medium problem, then summarize the repeated idea."}
+{"category": "dsa_planning", "user": "Make a quick graphs plan for me.", "assistant": "Choose one graphs subtopic, solve two examples, and finish by explaining the pattern in your own words."}
+{"category": "dsa_planning", "user": "Help me plan a 1 hour dynamic programming study session.", "assistant": "Use 10 minutes to review one dynamic programming concept, 35 minutes to solve two focused problems, and 15 minutes to review mistakes."}
+{"category": "dsa_planning", "user": "Plan my dynamic programming study session.", "assistant": "Pick one dynamic programming goal, review for 10 minutes, practice for 40 minutes, then write mistakes for 10 minutes."}
+{"category": "dsa_planning", "user": "Give me a 30 minute dynamic programming practice plan.", "assistant": "Spend 5 minutes reviewing dynamic programming, 20 minutes solving one problem, and 5 minutes writing the key pattern."}
+{"category": "dsa_planning", "user": "I have one hour for dynamic programming. What should I do?", "assistant": "Use 15 minutes for dynamic programming notes, 35 minutes for practice, and 10 minutes for a mistake log."}
+{"category": "dsa_planning", "user": "How should I revise dynamic programming today?", "assistant": "Review one dynamic programming pattern, solve one easy problem and one medium problem, then summarize the repeated idea."}
+{"category": "dsa_planning", "user": "Make a quick dynamic programming plan for me.", "assistant": "Choose one dynamic programming subtopic, solve two examples, and finish by explaining the pattern in your own words."}
+{"category": "ai_ml_basics", "user": "What is overfitting?", "assistant": "Overfitting means a model memorizes training data too closely and performs badly on new or unseen data."}
+{"category": "ai_ml_basics", "user": "what is overfitting?", "assistant": "Overfitting is when training performance looks good but validation or unseen data performance is poor."}
+{"category": "ai_ml_basics", "user": "Explain overfitting simply.", "assistant": "Overfitting means the model learned the training examples instead of a pattern that works on new data."}
+{"category": "ai_ml_basics", "user": "How do I detect overfitting?", "assistant": "A common sign is low training loss but high validation loss."}
+{"category": "ai_ml_basics", "user": "Why is overfitting bad?", "assistant": "Overfitting is bad because the model performs well on training data but poorly on unseen data."}
+{"category": "ai_ml_basics", "user": "Give an overfitting example.", "assistant": "If a model memorizes training answers but fails validation examples, it is overfitting."}
+{"category": "ai_ml_basics", "user": "What is underfitting?", "assistant": "Underfitting means the model is too simple or not trained enough and performs badly on both train and validation data."}
+{"category": "ai_ml_basics", "user": "Explain underfitting simply.", "assistant": "Underfitting is when the model has not learned the pattern, so both training and validation results are poor."}
+{"category": "ai_ml_basics", "user": "How do I detect underfitting?", "assistant": "Underfitting often shows high training loss and high validation loss."}
+{"category": "ai_ml_basics", "user": "Overfitting vs underfitting.", "assistant": "Overfitting is good train but poor validation; underfitting is poor train and poor validation."}
+{"category": "ai_ml_basics", "user": "What is training loss?", "assistant": "Training loss measures model error on the examples used for training."}
+{"category": "ai_ml_basics", "user": "What is validation loss?", "assistant": "Validation loss measures error on held-out data not used for training updates."}
+{"category": "ai_ml_basics", "user": "What is generalization?", "assistant": "Generalization means performing well on new or unseen data, not just training examples."}
+{"category": "ai_ml_basics", "user": "What is a model checkpoint?", "assistant": "A checkpoint is saved model weights that can be loaded later for training or chat."}
+{"category": "ai_ml_basics", "user": "What is fine-tuning?", "assistant": "Fine-tuning continues training a model on a smaller task-specific dataset."}
+{"category": "ai_ml_basics", "user": "What is SFT?", "assistant": "SFT means supervised fine-tuning on prompt and answer examples."}
+{"category": "ai_ml_basics", "user": "What is a tokenizer?", "assistant": "A tokenizer converts text into token IDs that the model can process."}
+{"category": "ai_ml_basics", "user": "What is a token?", "assistant": "A token is a chunk of text represented by an integer ID."}
+{"category": "ai_ml_basics", "user": "What is an epoch?", "assistant": "An epoch is one full pass over a training dataset."}
+{"category": "ai_ml_basics", "user": "What is a batch?", "assistant": "A batch is a group of examples processed together in one training step."}
+{"category": "ai_ml_basics", "user": "What is learning rate?", "assistant": "Learning rate controls how large each model update is during training."}
+{"category": "ai_ml_basics", "user": "What is gradient clipping?", "assistant": "Gradient clipping limits large updates to keep training stable."}
+{"category": "ai_ml_basics", "user": "What is validation data?", "assistant": "Validation data is held-out data used to check how well the model generalizes."}
+{"category": "ai_ml_basics", "user": "What is train data?", "assistant": "Train data is the data used to update model weights."}
+{"category": "ai_ml_basics", "user": "What is inference?", "assistant": "Inference is using a trained model to generate an answer."}
+{"category": "ai_ml_basics", "user": "What is temperature in generation?", "assistant": "Temperature controls randomness; lower values make output more conservative."}
+{"category": "ai_ml_basics", "user": "What is top-k sampling?", "assistant": "Top-k sampling limits generation to the k most likely next tokens."}
+{"category": "ai_ml_basics", "user": "What is a small language model?", "assistant": "A small language model has fewer parameters and needs cleaner, narrower training data."}
+{"category": "ai_ml_basics", "user": "Why can a tiny model mix answers?", "assistant": "A tiny model can mix answers when examples are too broad, repetitive, or weakly separated."}
+{"category": "ai_ml_basics", "user": "How do I reduce answer mixing?", "assistant": "Use direct examples, contrast pairs, low temperature, and evaluate on fixed prompts."}
+{"category": "ai_ml_basics", "user": "What is memorization in ML?", "assistant": "Memorization is copying training examples without learning a useful general pattern."}
+{"category": "ai_ml_basics", "user": "What is unseen data?", "assistant": "Unseen data is data the model did not train on."}
+{"category": "ai_ml_basics", "user": "What is held-out data?", "assistant": "Held-out data is reserved for validation or testing instead of training."}
+{"category": "ai_ml_basics", "user": "What is a baseline?", "assistant": "A baseline is a simple result used for comparison."}
+{"category": "ai_ml_basics", "user": "What is evaluation?", "assistant": "Evaluation checks model behavior on fixed prompts or held-out examples."}
+{"category": "ai_ml_basics", "user": "What is prompt masking?", "assistant": "Prompt masking trains loss on assistant answers while ignoring prompt tokens."}
+{"category": "ai_ml_basics", "user": "Why mask prompt tokens?", "assistant": "Masking prompt tokens focuses SFT learning on the assistant response."}
+{"category": "ai_ml_basics", "user": "What is catastrophic forgetting?", "assistant": "Catastrophic forgetting is when new training weakens behavior learned earlier."}
+{"category": "ai_ml_basics", "user": "What is data leakage?", "assistant": "Data leakage is when information appears in training or evaluation where it should not."}
+{"category": "ai_ml_basics", "user": "What is clean training data?", "assistant": "Clean training data is accurate, specific, deduplicated, and matched to the target behavior."}
+{"category": "byteseed_workflow", "user": "How do I run ByteSeed chat?", "assistant": "From D:\\ByteSeed, run python chat.py."}
+{"category": "byteseed_workflow", "user": "how do I run ByteSeed chat?", "assistant": "From the repo root, run python chat.py."}
+{"category": "byteseed_workflow", "user": "How do I start ByteSeed chat?", "assistant": "Open D:\\ByteSeed and run python chat.py."}
+{"category": "byteseed_workflow", "user": "What command starts ByteSeed chat?", "assistant": "Run python chat.py from D:\\ByteSeed."}
+{"category": "byteseed_workflow", "user": "How do I run chat with the venv Python?", "assistant": "Run .\\.venv\\Scripts\\python.exe chat.py from D:\\ByteSeed."}
+{"category": "byteseed_workflow", "user": "What is the ByteSeed chat command?", "assistant": "The normal command is python chat.py."}
+{"category": "byteseed_workflow", "user": "Do I run python chat.py.py?", "assistant": "No. Run python chat.py, not python chat.py.py."}
+{"category": "byteseed_workflow", "user": "How do I use a specific checkpoint in chat?", "assistant": "Run python chat.py --checkpoint checkpoints\\anchor_v2_finetuned.pt."}
+{"category": "byteseed_workflow", "user": "How do I use the old anchor checkpoint?", "assistant": "Run python chat.py --checkpoint checkpoints\\anchor_finetuned.pt."}
+{"category": "byteseed_workflow", "user": "How do I use the curated chat checkpoint?", "assistant": "Run python chat.py --checkpoint checkpoints\\chat_finetuned.pt."}
+{"category": "byteseed_workflow", "user": "What checkpoint should ByteSeed chat use now?", "assistant": "Use checkpoints\\anchor_v2_finetuned.pt after Anchor v2 training."}
+{"category": "byteseed_workflow", "user": "How do I build Anchor v2 SFT?", "assistant": "Run .\\.venv\\Scripts\\python.exe scripts\\build_anchor_v2_sft.py."}
+{"category": "byteseed_workflow", "user": "How do I train Anchor v2 SFT?", "assistant": "Run .\\.venv\\Scripts\\python.exe scripts\\run_anchor_v2_sft.py --iters 1000."}
+{"category": "byteseed_workflow", "user": "How do I evaluate Anchor v2?", "assistant": "Run .\\.venv\\Scripts\\python.exe scripts\\eval_anchor_v2.py --checkpoint checkpoints\\anchor_v2_finetuned.pt."}
+{"category": "byteseed_workflow", "user": "Where is the Anchor v2 raw file?", "assistant": "The raw Anchor v2 file is data\\raw\\assistant_sft\\anchor_v2_core.jsonl."}
+{"category": "byteseed_workflow", "user": "Where is the Anchor v2 SFT file?", "assistant": "The training-ready Anchor v2 file is examples\\byteseed_anchor_v2_sft.jsonl."}
+{"category": "byteseed_workflow", "user": "What does Anchor v2 train?", "assistant": "Anchor v2 trains identity, DSA concepts, DSA planning, AI basics, workflow, and troubleshooting."}
+{"category": "byteseed_workflow", "user": "Why avoid broad curated SFT now?", "assistant": "Broad curated SFT degraded this small model, so Anchor v2 keeps training narrow and direct."}
+{"category": "byteseed_workflow", "user": "How do I compile ByteSeed scripts?", "assistant": "Run python -m compileall src scripts chat.py."}
+{"category": "byteseed_workflow", "user": "How do I check the chat help?", "assistant": "Run .\\.venv\\Scripts\\python.exe chat.py --help."}
+{"category": "byteseed_workflow", "user": "Should I upload checkpoints to GitHub?", "assistant": "Usually no. Checkpoints are large generated files; keep them out of Git unless you intentionally use model storage."}
+{"category": "byteseed_workflow", "user": "Should I upload ByteSeed checkpoints to GitHub?", "assistant": "Do not upload checkpoints to normal GitHub commits by default; keep code and small data in Git."}
+{"category": "byteseed_workflow", "user": "What should I commit for Anchor v2?", "assistant": "Commit scripts, configs, README changes, and small JSONL examples, not generated checkpoints."}
+{"category": "byteseed_workflow", "user": "How do I override the default checkpoint?", "assistant": "Pass --checkpoint with the checkpoint path when running python chat.py."}
+{"category": "byteseed_workflow", "user": "What checkpoint does python chat.py prefer?", "assistant": "It prefers checkpoints\\anchor_v2_finetuned.pt, then anchor_finetuned.pt, then chat_finetuned.pt."}
+{"category": "byteseed_workflow", "user": "How do I reset the chat?", "assistant": "Use /reset inside chat to clear conversation history."}
+{"category": "byteseed_workflow", "user": "How do I quit chat?", "assistant": "Use /quit or /exit inside chat."}
+{"category": "byteseed_workflow", "user": "How do I lower randomness in chat?", "assistant": "Use /temp 0.2 inside chat."}
+{"category": "byteseed_workflow", "user": "How do I change max tokens in chat?", "assistant": "Use /max 80 inside chat."}
+{"category": "byteseed_workflow", "user": "How do I see raw model output?", "assistant": "Use /raw inside chat to toggle raw generated text."}
+{"category": "troubleshooting", "user": "My PyTorch says CUDA is false. What should I check?", "assistant": "Check torch.cuda.is_available(), the PyTorch CUDA build, the NVIDIA driver, and that your active venv has CUDA PyTorch."}
+{"category": "troubleshooting", "user": "torch.cuda.is_available() is false. What now?", "assistant": "Check that PyTorch was installed with CUDA support, your NVIDIA driver works, and the active venv is correct."}
+{"category": "troubleshooting", "user": "CUDA is false in PyTorch.", "assistant": "Verify the PyTorch CUDA build, NVIDIA driver, GPU visibility, and active virtual environment."}
+{"category": "troubleshooting", "user": "Why does PyTorch not see CUDA?", "assistant": "Common causes are CPU-only PyTorch, an old NVIDIA driver, wrong venv, or no visible NVIDIA GPU."}
+{"category": "troubleshooting", "user": "How do I check CUDA in Python?", "assistant": "Run python -c \"import torch; print(torch.cuda.is_available())\" in the active environment."}
+{"category": "troubleshooting", "user": "How do I check my PyTorch CUDA build?", "assistant": "Run python -c \"import torch; print(torch.version.cuda)\" and confirm it is not None."}
+{"category": "troubleshooting", "user": "How do I check the NVIDIA driver?", "assistant": "Run nvidia-smi in a terminal and confirm it shows your GPU."}
+{"category": "troubleshooting", "user": "Could the wrong venv make CUDA false?", "assistant": "Yes. Activate the correct venv and check that it has the CUDA-enabled PyTorch install."}
+{"category": "troubleshooting", "user": "CUDA false after installing torch.", "assistant": "Confirm you did not install a CPU-only torch wheel and that your NVIDIA driver supports the CUDA build."}
+{"category": "troubleshooting", "user": "What should CUDA troubleshooting mention?", "assistant": "For CUDA false, mention PyTorch, CUDA build, NVIDIA driver, GPU visibility, and venv."}
+{"category": "troubleshooting", "user": "My chat command says file not found.", "assistant": "Run commands from D:\\ByteSeed, then use python chat.py."}
+{"category": "troubleshooting", "user": "python chat.py cannot find checkpoint.", "assistant": "Train or pass an existing checkpoint path with --checkpoint."}
+{"category": "troubleshooting", "user": "Anchor v2 checkpoint is missing.", "assistant": "Build the Anchor v2 SFT file, then run scripts\\run_anchor_v2_sft.py to create checkpoints\\anchor_v2_finetuned.pt."}
+{"category": "troubleshooting", "user": "The model answers the wrong concept.", "assistant": "Add direct contrast examples, train on Anchor data only, and evaluate fixed prompts."}
+{"category": "troubleshooting", "user": "The model says queue for stack.", "assistant": "Add stack examples that say LIFO, push, pop, and top, plus queue contrast examples that say FIFO."}
+{"category": "troubleshooting", "user": "The model breaks overfitting answers.", "assistant": "Add overfitting examples that mention training data and validation or unseen data."}
+{"category": "troubleshooting", "user": "The model repeats the same study plan.", "assistant": "Add varied planning examples with different topics, times, and review steps."}
+{"category": "troubleshooting", "user": "The model says python chat.py.py.", "assistant": "Add workflow examples that say exactly python chat.py and explicitly reject python chat.py.py."}
+{"category": "troubleshooting", "user": "The model leaks DSA words into CUDA.", "assistant": "Train CUDA troubleshooting examples that mention PyTorch, CUDA build, NVIDIA driver, and venv only."}
+{"category": "troubleshooting", "user": "Evaluation fails for one prompt.", "assistant": "Inspect the generated answer, add targeted anchor examples, retrain Anchor v2, and evaluate again."}
+{"category": "troubleshooting", "user": "compileall fails.", "assistant": "Read the syntax error path, fix that file, then rerun python -m compileall src scripts chat.py."}
+{"category": "troubleshooting", "user": "SFT file is missing.", "assistant": "Run the matching build script before training."}
+{"category": "troubleshooting", "user": "Training cannot load best.pt.", "assistant": "Check that checkpoints\\best.pt exists before Anchor v2 SFT."}
+{"category": "troubleshooting", "user": "CUDA out of memory during SFT.", "assistant": "Lower batch size in the config or reduce max tokens; do not change model architecture for this task."}
+{"category": "troubleshooting", "user": "Chat output is empty.", "assistant": "Try lower temperature or evaluate the checkpoint with scripts\\eval_anchor_v2.py."}
+{"category": "troubleshooting", "user": "Chat output has strange fragments.", "assistant": "Use lower temperature and train on cleaner direct examples."}
+{"category": "troubleshooting", "user": "My venv command fails.", "assistant": "From D:\\ByteSeed, check that .\\.venv\\Scripts\\python.exe exists."}
+{"category": "troubleshooting", "user": "Tokenizer files are missing.", "assistant": "Use the existing tokenizer files for this task; do not retrain tokenizer for Anchor v2."}
+{"category": "troubleshooting", "user": "The checkpoint path has slashes.", "assistant": "Windows accepts backslashes; pass paths like checkpoints\\anchor_v2_finetuned.pt."}
+{"category": "troubleshooting", "user": "How do I verify the default checkpoint?", "assistant": "Run python chat.py and read the startup banner line labeled ckpt."}

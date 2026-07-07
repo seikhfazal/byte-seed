@@ -1,0 +1,37 @@
+﻿# Python environments and caches
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Local secrets and logs
+.env
+*.log
+
+# Model checkpoints and large model artifacts
+checkpoints/
+*.pt
+*.pth
+*.safetensors
+*.bin
+*.ckpt
+
+# Tokenizer binaries
+tokenizer/*.model
+tokenizer/*.vocab
+
+# Generated training outputs
+data/processed/
+runs/
+wandb/
+
+# Imported/generated data artifacts
+data/public_imports/
+data/raw/public_imports/
+*.parquet
+*.arrow
+*.jsonl.tmp
+
+tokenizer/corpus.txt
+data/raw/byteseed_personal_assistant_corpus.md
+data/raw/generated/

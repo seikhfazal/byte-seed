@@ -1,0 +1,5 @@
+{"user": "What is a stack?", "assistant": "A stack is a linear data structure that follows LIFO: last in, first out."}
+{"user": "What is a queue?", "assistant": "A queue is a linear data structure that follows FIFO: first in, first out."}
+{"user": "What does a language model learn?", "assistant": "A language model learns statistical patterns in text so it can predict the next token."}
+{"user": "Why should code use clear names?", "assistant": "Clear names make code easier to read, review, debug, and maintain."}
+
