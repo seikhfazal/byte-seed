@@ -11,10 +11,10 @@ python chat.py
 The root launcher auto-selects the best available checkpoint. The current stable checkpoint is:
 
 ```text
-checkpoints/anchor_v2_2_finetuned.pt
+checkpoints/anchor_v2_3_finetuned.pt
 ```
 
-Default preset is `precise`.
+Default preset is `precise`. Default history mode is off.
 
 Preset examples:
 
@@ -24,10 +24,10 @@ python chat.py --preset balanced
 python chat.py --preset creative
 ```
 
-To explicitly use it:
+To explicitly use the stable checkpoint:
 
 ```powershell
-python chat.py --checkpoint checkpoints\anchor_v2_2_finetuned.pt
+python chat.py --checkpoint checkpoints\anchor_v2_3_finetuned.pt
 ```
 
 ## Useful Chat Commands
@@ -43,5 +43,22 @@ python chat.py --checkpoint checkpoints\anchor_v2_2_finetuned.pt
 - `/help`
 - `/exit`
 
-Default history mode is off.
+## Inference Dtype And Benchmarks
 
+Default dtype mode is `auto`: fp16 on CUDA, fp32 on CPU. You can override it:
+
+```powershell
+python chat.py --dtype auto
+python chat.py --dtype fp32
+python chat.py --dtype fp16
+```
+
+Benchmark examples:
+
+```powershell
+python scripts/benchmark_generation.py --dtype fp32
+python scripts/benchmark_generation.py --dtype fp16
+python scripts/benchmark_generation.py --dtype auto
+```
+
+`torch.compile` is available through `--compile`, but it is optional and experimental.

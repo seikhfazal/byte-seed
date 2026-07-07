@@ -4,14 +4,16 @@ ByteSeed is a tiny GPT-style decoder-only Transformer built from scratch in PyTo
 
 ## Status
 
-Current stable baby assistant checkpoint: `anchor_v2_2`.
+Current stable baby assistant checkpoint: `anchor_v2_3`.
 
-Local v0.2 optimization work includes Anchor v2.3, a tiny targeted patch for underfitting wording and CUDA false troubleshooting confusion. It is not a broad model upgrade.
+Anchor v2.3 is a tiny targeted patch for underfitting wording and CUDA false troubleshooting confusion. It is not a broad model upgrade.
+
+v0.3-speed adds inference dtype options and better benchmarking. It does not change training or model architecture.
 
 The current stable local checkpoint is:
 
 ```text
-checkpoints/anchor_v2_2_finetuned.pt
+checkpoints/anchor_v2_3_finetuned.pt
 ```
 
 `python chat.py` auto-selects this checkpoint when it exists.
@@ -21,14 +23,16 @@ Suggested GitHub topics: pytorch, transformer, gpt, llm, language-model, from-sc
 ## Features
 
 - Manually implemented GPT-style model
-- Local training and inference
-- SentencePiece tokenizer
+- Tokenizer pipeline with SentencePiece
+- Local training loop and inference/generation
 - CUDA support
 - Chat CLI with `python chat.py`
 - Stateless single-turn mode by default
-- Checkpoint auto-selection
+- Checkpoint saving, loading, and auto-selection
 - Supervised fine-tuning workflow
-- Dataset and evaluation scripts
+- Dataset preparation and cleaning scripts
+- Evaluation scripts
+- Generation benchmark script
 
 ## What ByteSeed Is Not
 
@@ -70,7 +74,15 @@ python chat.py
 To explicitly select the stable checkpoint:
 
 ```powershell
-python chat.py --checkpoint checkpoints\anchor_v2_2_finetuned.pt
+python chat.py --checkpoint checkpoints\anchor_v2_3_finetuned.pt
+```
+
+Useful launch examples:
+
+```powershell
+python chat.py
+python chat.py --dtype fp32
+python chat.py --preset balanced
 ```
 
 Useful chat commands:
@@ -90,7 +102,7 @@ Default history mode is off because the current assistant works best as a single
 
 See [docs/HOW_TO_RUN.md](docs/HOW_TO_RUN.md) for more details.
 
-## How To Train And Evaluate
+## How To Evaluate And Benchmark
 
 Count parameters:
 
@@ -104,18 +116,21 @@ Compile-check source files:
 python -m compileall src scripts chat.py
 ```
 
-Run the current Anchor v2.2 evaluation:
+Run the stable regression evaluation:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\eval_anchor_v2_2.py --checkpoint checkpoints\anchor_v2_2_finetuned.pt
+.\.venv\Scripts\python.exe scripts\eval_stable_v0_2.py --checkpoint checkpoints\anchor_v2_3_finetuned.pt
 ```
 
-Build and train the current cleanup SFT dataset:
+Benchmark dtype examples:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\build_anchor_v2_2_sft.py
-.\.venv\Scripts\python.exe scripts\run_anchor_v2_2_sft.py --iters 300
+python scripts/benchmark_generation.py --dtype fp32
+python scripts/benchmark_generation.py --dtype fp16
+python scripts/benchmark_generation.py --dtype auto
 ```
+
+`torch.compile` is optional and experimental. Use `--compile` only when you want to test startup overhead and local compatibility.
 
 Training notes are documented in [docs/TRAINING_NOTES.md](docs/TRAINING_NOTES.md).
 
@@ -154,14 +169,13 @@ See [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
 
 Do not commit checkpoints by default. Keep generated checkpoint files in `checkpoints/` locally or move them to external storage later if needed.
 
-Before a first GitHub push, run:
+Before making the repository public, run:
 
 ```powershell
 git status
+git status --ignored
 ```
 
-Confirm that `.venv/`, `checkpoints/`, processed data, runs, logs, and secrets are not staged.
+Confirm that `.venv/`, `checkpoints/`, tokenizer binary files, processed data, runs, logs, and secrets are not staged.
 
-See [docs/REPO_HYGIENE.md](docs/REPO_HYGIENE.md).
-
-
+See [docs/REPO_HYGIENE.md](docs/REPO_HYGIENE.md) and [docs/PUBLIC_RELEASE_CHECKLIST.md](docs/PUBLIC_RELEASE_CHECKLIST.md).

@@ -102,7 +102,7 @@ class GPT(nn.Module):
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-100)
         return logits, loss
 
-    @torch.no_grad()
+    @torch.inference_mode()
     def generate(
         self,
         idx: torch.Tensor,
@@ -139,6 +139,7 @@ class GPT(nn.Module):
             if stop_ids is not None and next_id.numel() == 1 and int(next_id.item()) in stop_ids:
                 break
         return idx
+
 
 
 

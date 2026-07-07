@@ -25,12 +25,13 @@ Useful anchor checkpoints produced during development:
 - `checkpoints/anchor_v2_finetuned.pt`
 - `checkpoints/anchor_v2_1_finetuned.pt`
 - `checkpoints/anchor_v2_2_finetuned.pt`
+- `checkpoints/anchor_v2_3_finetuned.pt`
 
 ## Current Stable Checkpoint
 
-`checkpoints/anchor_v2_2_finetuned.pt` is the current stable checkpoint.
+`checkpoints/anchor_v2_3_finetuned.pt` is the current stable checkpoint.
 
-Anchor v2.2 focused on cleaning label artifacts, improving the demo prompts, and keeping answers short and direct.
+Anchor v2.2 focused on cleaning label artifacts, improving the demo prompts, and keeping answers short and direct. Anchor v2.3 is a tiny targeted patch for underfitting wording and CUDA false troubleshooting confusion.
 
 ## Chat Mode
 
@@ -38,7 +39,6 @@ Stateless chat became the default because the model was trained mostly on single
 
 Broad curated SFT is not recommended right now for this checkpoint family.
 
-## Anchor v2.3 Local Patch
+## v0.3-speed Local Work
 
-Anchor v2.3 is a tiny targeted local patch for underfitting wording and CUDA false troubleshooting confusion. It starts from checkpoints/anchor_v2_2_finetuned.pt and writes checkpoints/anchor_v2_3_finetuned.pt. It is not a broad model improvement, and the same small-model limitations still apply.
-
+v0.3-speed adds inference dtype options (`auto`, `fp32`, `fp16`) and expanded benchmark reporting. `auto` uses fp16 on CUDA and fp32 on CPU. `torch.compile` is exposed as an optional experimental flag and is off by default. This work does not train, pretrain, or change model architecture.

@@ -23,7 +23,6 @@ PREFERRED_CHECKPOINTS = (
     "checkpoints/anchor_finetuned.pt",
     "checkpoints/chat_finetuned.pt",
 )
-
 PRESETS = {
     "precise": {"temperature": 0.2, "top_k": 5, "max_new_tokens": 80},
     "balanced": {"temperature": 0.3, "top_k": 8, "max_new_tokens": 120},
@@ -59,6 +58,35 @@ def resolve_checkpoint_label(config_path: str, checkpoint: str | None) -> str:
     return str(path) if path is not None else "latest checkpoint"
 
 
+def resolve_dtype(requested: str, device: torch.device) -> str:
+    if requested == "auto":
+        return "fp16" if device.type == "cuda" else "fp32"
+    if requested == "fp16" and device.type != "cuda":
+        print("Warning: --dtype fp16 requires CUDA; falling back to fp32.")
+        return "fp32"
+    return requested
+
+
+def apply_inference_dtype(model: torch.nn.Module, dtype_name: str) -> torch.nn.Module:
+    if dtype_name == "fp16":
+        model = model.half()
+    else:
+        model = model.float()
+    model.eval()
+    return model
+
+
+def maybe_compile_forward(model: torch.nn.Module, enabled: bool) -> bool:
+    if not enabled:
+        return False
+    try:
+        model.forward = torch.compile(model.forward)  # type: ignore[method-assign]
+    except Exception as exc:  # pragma: no cover - depends on local torch/platform support.
+        print(f"Warning: torch.compile failed; continuing without compile: {exc}")
+        return False
+    return True
+
+
 def show_help() -> None:
     print("Commands:")
     print("  /reset         clear conversation history")
@@ -84,6 +112,8 @@ def print_banner(
     max_new_tokens: int,
     history_enabled: bool,
     repetition_penalty: float,
+    dtype_name: str,
+    compiled: bool,
 ) -> None:
     line = "=" * 60
     top_k_text = "none" if top_k is None else str(top_k)
@@ -94,6 +124,8 @@ def print_banner(
     print(f"params: {format_params(params)}")
     print(f"device: {device.type}")
     print(f"ckpt: {checkpoint}")
+    print(f"dtype: {dtype_name}")
+    print(f"compile: {'on' if compiled else 'off'}")
     print(f"preset: {preset}")
     print(f"temp: {temperature:g} | top_k: {top_k_text} | max_new: {max_new_tokens}")
     print(f"repetition_penalty: {repetition_penalty:g}")
@@ -245,15 +277,16 @@ def generate_reply(
     device = next(model.parameters()).device
     input_ids = tokenizer.encode(prompt, add_bos=True)
     ids = torch.tensor([input_ids], dtype=torch.long, device=device)
-    out = model.generate(
-        ids,
-        max_new_tokens=max_new_tokens,
-        temperature=temperature,
-        top_k=top_k,
-        vocab_limit=tokenizer.vocab_size,
-        stop_token_ids=stops,
-        repetition_penalty=repetition_penalty,
-    )
+    with torch.inference_mode():
+        out = model.generate(
+            ids,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+            top_k=top_k,
+            vocab_limit=tokenizer.vocab_size,
+            stop_token_ids=stops,
+            repetition_penalty=repetition_penalty,
+        )
     new_token_ids = out[0, ids.shape[1] :].tolist()
     raw_text = tokenizer.decode(new_token_ids)
     return raw_text, clean_assistant_output(raw_text)
@@ -265,6 +298,9 @@ def run_chat(args: argparse.Namespace) -> None:
     checkpoint_label = resolve_checkpoint_label(args.config, args.checkpoint)
     model = load_model(cfg, args.checkpoint)
     device = next(model.parameters()).device
+    dtype_name = resolve_dtype(args.dtype, device)
+    model = apply_inference_dtype(model, dtype_name)
+    compiled = maybe_compile_forward(model, args.compile)
     stop_at_end = marker_id(tokenizer, "<|end|>") is not None
     stops = stop_token_ids(tokenizer, stop_at_end)
     temperature, top_k, max_new_tokens = resolved_generation_settings(args)
@@ -292,6 +328,8 @@ def run_chat(args: argparse.Namespace) -> None:
         max_new_tokens,
         history_enabled,
         args.repetition_penalty,
+        dtype_name,
+        compiled,
     )
     while True:
         try:
@@ -352,6 +390,8 @@ def build_parser(default_config: str, default_checkpoint: str | None, default_pr
     parser.add_argument("--max-new-tokens", type=int, default=None, help="Override the selected preset max_new_tokens.")
     parser.add_argument("--temperature", type=float, default=None, help="Override the selected preset temperature.")
     parser.add_argument("--top-k", type=int, default=None, help="Override the selected preset top_k.")
+    parser.add_argument("--dtype", choices=("auto", "fp32", "fp16"), default="auto", help="Inference dtype. auto uses fp16 on CUDA and fp32 on CPU.")
+    parser.add_argument("--compile", action="store_true", help="Try torch.compile on the model forward pass. Experimental and off by default.")
     parser.add_argument("--repetition-penalty", type=float, default=1.0, help="Optional generation repetition penalty. Default preserves existing behavior.")
     parser.add_argument("--history-turns", type=int, default=0, help="Enable startup history mode and keep up to this many previous turns, capped at 2. Default is stateless.")
     parser.add_argument("--json", action="store_true", help="Experimental and unreliable JSON output mode.")
@@ -376,4 +416,3 @@ def main(
 
 if __name__ == "__main__":
     main()
-
