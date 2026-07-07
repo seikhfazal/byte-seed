@@ -1,4 +1,4 @@
-[build-system]
+﻿[build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
@@ -10,6 +10,18 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "ByteSeed contributors" }]
+keywords = [
+  "pytorch",
+  "transformer",
+  "gpt",
+  "llm",
+  "language-model",
+  "from-scratch",
+  "machine-learning",
+  "deep-learning",
+  "cuda",
+  "sentencepiece",
+]
 dependencies = ["torch", "sentencepiece", "pyyaml", "tqdm", "numpy"]
 
 [project.scripts]
@@ -20,4 +32,5 @@ package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
 

@@ -1,6 +1,8 @@
 ﻿from __future__ import annotations
 
 import argparse
+import re
+import string
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -13,6 +15,16 @@ from .tokenizer import ByteSeedTokenizer
 from .utils import latest_checkpoint
 
 COMMANDS = "/reset  /history [on|off]  /quit  /exit  /temp <val>  /topk <val>  /max <val>  /raw  /help"
+PRESETS = {
+    "precise": {"temperature": 0.2, "top_k": 5, "max_new_tokens": 80},
+    "balanced": {"temperature": 0.3, "top_k": 8, "max_new_tokens": 120},
+    "creative": {"temperature": 0.7, "top_k": 20, "max_new_tokens": 160},
+}
+TRAILING_LABEL_PATTERNS = (
+    re.compile(r"\s+(?:Reinforcement|Stack contrast|Queue contrast|Hygiene note)\s+\d+\.?\s*$", re.IGNORECASE),
+    re.compile(r"\s+Command note(?:\s+\d+)?\.?\s*$", re.IGNORECASE),
+    re.compile(r"\s+Check\s+\d+\.?\s*$", re.IGNORECASE),
+)
 
 
 def parameter_count(model: torch.nn.Module) -> int:
@@ -50,10 +62,12 @@ def print_banner(
     params: int,
     device: torch.device,
     checkpoint: str,
+    preset: str,
     temperature: float,
     top_k: int | None,
     max_new_tokens: int,
     history_enabled: bool,
+    repetition_penalty: float,
 ) -> None:
     line = "=" * 60
     top_k_text = "none" if top_k is None else str(top_k)
@@ -64,7 +78,9 @@ def print_banner(
     print(f"params: {format_params(params)}")
     print(f"device: {device.type}")
     print(f"ckpt: {checkpoint}")
+    print(f"preset: {preset}")
     print(f"temp: {temperature:g} | top_k: {top_k_text} | max_new: {max_new_tokens}")
+    print(f"repetition_penalty: {repetition_penalty:g}")
     print(f"history: {'on' if history_enabled else 'off'}")
     print(f"commands: {COMMANDS}")
     print(line)
@@ -79,11 +95,29 @@ def build_prompt(history: list[tuple[str, str]], user_message: str) -> str:
 
 
 def clean_assistant_output(text: str) -> str:
+    for token in ("<|end|>", "<|user|>", "<|assistant|>"):
+        text = text.replace(token + token, token)
     for marker in ("<|end|>", "<|user|>", "<|assistant|>"):
         index = text.find(marker)
         if index >= 0:
             text = text[:index]
+    text = text.strip()
+    changed = True
+    while changed:
+        changed = False
+        for pattern in TRAILING_LABEL_PATTERNS:
+            cleaned = pattern.sub("", text).strip()
+            if cleaned != text:
+                text = cleaned
+                changed = True
     return text.strip()
+
+
+def is_degenerate_reply(text: str) -> bool:
+    stripped = text.strip()
+    if not stripped:
+        return True
+    return all(char in string.punctuation or char.isspace() for char in stripped)
 
 
 def parse_positive_int(value: str, name: str) -> int | None:
@@ -110,11 +144,11 @@ def parse_float(value: str, name: str) -> float | None:
     return parsed
 
 
-def show_history_mode(settings: dict[str, float | int | bool | None]) -> None:
+def show_history_mode(settings: dict[str, float | int | bool | str | None]) -> None:
     print(f"history mode: {'on' if settings.get('history_enabled', False) else 'off'}")
 
 
-def handle_command(command: str, history: list[tuple[str, str]], settings: dict[str, float | int | bool | None]) -> bool:
+def handle_command(command: str, history: list[tuple[str, str]], settings: dict[str, float | int | bool | str | None]) -> bool:
     parts = command.split()
     name = parts[0].lower()
     if name in {"/quit", "/exit"}:
@@ -173,6 +207,42 @@ def handle_command(command: str, history: list[tuple[str, str]], settings: dict[
     return True
 
 
+def resolved_generation_settings(args: argparse.Namespace) -> tuple[float, int | None, int]:
+    preset = PRESETS[args.preset]
+    temperature = args.temperature if args.temperature is not None else float(preset["temperature"])
+    top_k = args.top_k if args.top_k is not None else int(preset["top_k"])
+    max_new_tokens = args.max_new_tokens if args.max_new_tokens is not None else int(preset["max_new_tokens"])
+    return temperature, top_k, max_new_tokens
+
+
+def generate_reply(
+    model: torch.nn.Module,
+    tokenizer: ByteSeedTokenizer,
+    prompt: str,
+    stops: set[int],
+    *,
+    temperature: float,
+    top_k: int | None,
+    max_new_tokens: int,
+    repetition_penalty: float,
+) -> tuple[str, str]:
+    device = next(model.parameters()).device
+    input_ids = tokenizer.encode(prompt, add_bos=True)
+    ids = torch.tensor([input_ids], dtype=torch.long, device=device)
+    out = model.generate(
+        ids,
+        max_new_tokens=max_new_tokens,
+        temperature=temperature,
+        top_k=top_k,
+        vocab_limit=tokenizer.vocab_size,
+        stop_token_ids=stops,
+        repetition_penalty=repetition_penalty,
+    )
+    new_token_ids = out[0, ids.shape[1] :].tolist()
+    raw_text = tokenizer.decode(new_token_ids)
+    return raw_text, clean_assistant_output(raw_text)
+
+
 def run_chat(args: argparse.Namespace) -> None:
     cfg = load_config(args.config)
     tokenizer = ByteSeedTokenizer(cfg.tokenizer_dir)
@@ -181,11 +251,14 @@ def run_chat(args: argparse.Namespace) -> None:
     device = next(model.parameters()).device
     stop_at_end = marker_id(tokenizer, "<|end|>") is not None
     stops = stop_token_ids(tokenizer, stop_at_end)
+    temperature, top_k, max_new_tokens = resolved_generation_settings(args)
     history_enabled = args.history_turns > 0
-    settings: dict[str, float | int | bool | None] = {
-        "temperature": args.temperature,
-        "top_k": args.top_k,
-        "max_new_tokens": args.max_new_tokens,
+    settings: dict[str, float | int | bool | str | None] = {
+        "preset": args.preset,
+        "temperature": temperature,
+        "top_k": top_k,
+        "max_new_tokens": max_new_tokens,
+        "repetition_penalty": args.repetition_penalty,
         "raw": False,
         "history_enabled": history_enabled,
     }
@@ -197,10 +270,12 @@ def run_chat(args: argparse.Namespace) -> None:
         parameter_count(model),
         device,
         checkpoint_label,
-        args.temperature,
-        args.top_k,
-        args.max_new_tokens,
+        args.preset,
+        temperature,
+        top_k,
+        max_new_tokens,
         history_enabled,
+        args.repetition_penalty,
     )
     while True:
         try:
@@ -220,22 +295,30 @@ def run_chat(args: argparse.Namespace) -> None:
         prompt = build_prompt(prompt_history, user)
         if args.json:
             prompt += "Return a compact JSON object. This mode is experimental.\n"
-        input_ids = tokenizer.encode(prompt, add_bos=True)
-        ids = torch.tensor([input_ids], dtype=torch.long, device=device)
-        out = model.generate(
-            ids,
-            max_new_tokens=int(settings["max_new_tokens"] or 1),
+        raw_text, assistant = generate_reply(
+            model,
+            tokenizer,
+            prompt,
+            stops,
             temperature=float(settings["temperature"] or 1.0),
             top_k=int(settings["top_k"]) if settings["top_k"] is not None else None,
-            vocab_limit=tokenizer.vocab_size,
-            stop_token_ids=stops,
+            max_new_tokens=int(settings["max_new_tokens"] or 1),
+            repetition_penalty=float(settings["repetition_penalty"] or 1.0),
         )
-        new_token_ids = out[0, ids.shape[1] :].tolist()
-        text = tokenizer.decode(new_token_ids)
+        if is_degenerate_reply(assistant):
+            raw_text, assistant = generate_reply(
+                model,
+                tokenizer,
+                prompt,
+                stops,
+                temperature=0.5,
+                top_k=10,
+                max_new_tokens=max(120, int(settings["max_new_tokens"] or 1)),
+                repetition_penalty=float(settings["repetition_penalty"] or 1.0),
+            )
         if settings["raw"]:
-            print(f"raw: {text!r}")
-        assistant = clean_assistant_output(text)
-        if assistant:
+            print(f"raw: {raw_text!r}")
+        if not is_degenerate_reply(assistant):
             print(f"ByteSeed: {assistant}")
         else:
             print("ByteSeed: [empty reply generated; try /temp 0.5 or /max 160]")
@@ -245,13 +328,15 @@ def run_chat(args: argparse.Namespace) -> None:
                 del history[:-max_history_turns]
 
 
-def build_parser(default_config: str, default_checkpoint: str | None, default_temperature: float, default_top_k: int | None, default_max_new_tokens: int) -> argparse.ArgumentParser:
+def build_parser(default_config: str, default_checkpoint: str | None, default_preset: str) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Interactive ByteSeed terminal chat.")
     parser.add_argument("--config", default=default_config)
     parser.add_argument("--checkpoint", default=default_checkpoint)
-    parser.add_argument("--max-new-tokens", type=int, default=default_max_new_tokens)
-    parser.add_argument("--temperature", type=float, default=default_temperature)
-    parser.add_argument("--top-k", type=int, default=default_top_k)
+    parser.add_argument("--preset", choices=sorted(PRESETS), default=default_preset)
+    parser.add_argument("--max-new-tokens", type=int, default=None, help="Override the selected preset max_new_tokens.")
+    parser.add_argument("--temperature", type=float, default=None, help="Override the selected preset temperature.")
+    parser.add_argument("--top-k", type=int, default=None, help="Override the selected preset top_k.")
+    parser.add_argument("--repetition-penalty", type=float, default=1.0, help="Optional generation repetition penalty. Default preserves existing behavior.")
     parser.add_argument("--history-turns", type=int, default=0, help="Enable startup history mode and keep up to this many previous turns, capped at 2. Default is stateless.")
     parser.add_argument("--json", action="store_true", help="Experimental and unreliable JSON output mode.")
     return parser
@@ -262,13 +347,11 @@ def main(
     *,
     default_config: str = "configs/byteseed_12m.yaml",
     default_checkpoint: str | None = None,
-    default_temperature: float = 0.3,
-    default_top_k: int | None = 8,
-    default_max_new_tokens: int = 120,
+    default_preset: str = "precise",
 ) -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    parser = build_parser(default_config, default_checkpoint, default_temperature, default_top_k, default_max_new_tokens)
+    parser = build_parser(default_config, default_checkpoint, default_preset)
     args = parser.parse_args(argv)
     run_chat(args)
 

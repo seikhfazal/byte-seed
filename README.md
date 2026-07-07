@@ -14,6 +14,8 @@ checkpoints/anchor_v2_2_finetuned.pt
 
 `python chat.py` auto-selects this checkpoint when it exists.
 
+Suggested GitHub topics: pytorch, transformer, gpt, llm, language-model, from-scratch, machine-learning, deep-learning, cuda, sentencepiece
+
 ## Features
 
 - Manually implemented GPT-style model
@@ -159,3 +161,4 @@ git status
 Confirm that `.venv/`, `checkpoints/`, processed data, runs, logs, and secrets are not staged.
 
 See [docs/REPO_HYGIENE.md](docs/REPO_HYGIENE.md).
+

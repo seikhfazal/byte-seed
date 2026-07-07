@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import math
 
@@ -111,6 +111,7 @@ class GPT(nn.Module):
         top_k: int | None = None,
         vocab_limit: int | None = None,
         stop_token_ids: set[int] | None = None,
+        repetition_penalty: float = 1.0,
     ) -> torch.Tensor:
         self.eval()
         stop_ids = {int(token_id) for token_id in stop_token_ids} if stop_token_ids is not None else None
@@ -120,6 +121,15 @@ class GPT(nn.Module):
             logits = logits[:, -1, :] / max(temperature, 1e-6)
             if vocab_limit is not None and vocab_limit < logits.size(-1):
                 logits[:, vocab_limit:] = -float("inf")
+            if repetition_penalty > 1.0:
+                for batch_index in range(idx.size(0)):
+                    seen = torch.unique(idx[batch_index])
+                    token_logits = logits[batch_index, seen]
+                    logits[batch_index, seen] = torch.where(
+                        token_logits > 0,
+                        token_logits / repetition_penalty,
+                        token_logits * repetition_penalty,
+                    )
             if top_k is not None and top_k > 0:
                 values, _ = torch.topk(logits, min(top_k, logits.size(-1)))
                 logits[logits < values[:, [-1]]] = -float("inf")
@@ -129,6 +139,7 @@ class GPT(nn.Module):
             if stop_ids is not None and next_id.numel() == 1 and int(next_id.item()) in stop_ids:
                 break
         return idx
+
 
 
 

@@ -14,6 +14,16 @@ The root launcher auto-selects the best available checkpoint. The current stable
 checkpoints/anchor_v2_2_finetuned.pt
 ```
 
+Default preset is `precise`.
+
+Preset examples:
+
+```powershell
+python chat.py
+python chat.py --preset balanced
+python chat.py --preset creative
+```
+
 To explicitly use it:
 
 ```powershell
@@ -34,3 +44,4 @@ python chat.py --checkpoint checkpoints\anchor_v2_2_finetuned.pt
 - `/exit`
 
 Default history mode is off.
+
