@@ -53,7 +53,7 @@ def _critical_config(tiny_config) -> dict[str, Any]:
     )
 
 
-def _exact_checkpoint(tiny_config) -> dict[str, Any]:
+def _exact_checkpoint(tiny_config, checkpoint_provenance) -> dict[str, Any]:
     critical = _critical_config(tiny_config)
     resume_state = build_resume_state(
         scaler=FakeScaler(False),
@@ -69,11 +69,12 @@ def _exact_checkpoint(tiny_config) -> dict[str, Any]:
         iteration=4,
         best_val=0.25,
         resume_state=resume_state,
+        provenance=checkpoint_provenance,
     )
 
 
-def test_new_pretrain_checkpoint_contains_versioned_exact_resume_state(tiny_config):
-    checkpoint = _exact_checkpoint(tiny_config)
+def test_new_pretrain_checkpoint_contains_versioned_exact_resume_state(tiny_config, checkpoint_provenance):
+    checkpoint = _exact_checkpoint(tiny_config, checkpoint_provenance)
 
     state = validate_exact_resume_checkpoint(checkpoint)
 
@@ -103,31 +104,31 @@ def test_non_pretrain_checkpoint_is_not_exact_resumable(kind, tiny_config):
     assert not is_exact_resumable(checkpoint)
 
 
-def test_future_resume_state_version_fails_clearly(tiny_config):
-    checkpoint = _exact_checkpoint(tiny_config)
+def test_future_resume_state_version_fails_clearly(tiny_config, checkpoint_provenance):
+    checkpoint = _exact_checkpoint(tiny_config, checkpoint_provenance)
     checkpoint["resume_state"]["version"] = RESUME_STATE_VERSION + 1
 
     with pytest.raises(CheckpointValidationError, match="Unsupported resume-state version"):
         validate_exact_resume_checkpoint(checkpoint)
 
 
-def test_missing_required_resume_field_fails_clearly(tiny_config):
-    checkpoint = _exact_checkpoint(tiny_config)
+def test_missing_required_resume_field_fails_clearly(tiny_config, checkpoint_provenance):
+    checkpoint = _exact_checkpoint(tiny_config, checkpoint_provenance)
     del checkpoint["resume_state"]["rng_state"]
 
     with pytest.raises(CheckpointValidationError, match="missing required fields: rng_state"):
         validate_exact_resume_checkpoint(checkpoint)
 
 
-def test_missing_critical_training_configuration_fails_exact_validation(tiny_config):
-    checkpoint = _exact_checkpoint(tiny_config)
+def test_missing_critical_training_configuration_fails_exact_validation(tiny_config, checkpoint_provenance):
+    checkpoint = _exact_checkpoint(tiny_config, checkpoint_provenance)
     del checkpoint["resume_state"]["training_config"]["batch_size"]
 
     with pytest.raises(CheckpointValidationError, match="training_config is incomplete.*batch_size"):
         validate_exact_resume_checkpoint(checkpoint)
 
-def test_exact_resume_requires_structural_optimizer_state(tiny_config):
-    checkpoint = _exact_checkpoint(tiny_config)
+def test_exact_resume_requires_structural_optimizer_state(tiny_config, checkpoint_provenance):
+    checkpoint = _exact_checkpoint(tiny_config, checkpoint_provenance)
     del checkpoint["optimizer"]
 
     assert not is_exact_resumable(checkpoint)
@@ -256,8 +257,8 @@ def test_scaler_enablement_mismatch_fails_clearly():
         restore_scaler_state(FakeScaler(False), {"enabled": True, "state": {"scale": 2.0}})
 
 
-def test_missing_active_scaler_state_cannot_validate_as_exact(tiny_config):
-    checkpoint = _exact_checkpoint(tiny_config)
+def test_missing_active_scaler_state_cannot_validate_as_exact(tiny_config, checkpoint_provenance):
+    checkpoint = _exact_checkpoint(tiny_config, checkpoint_provenance)
     checkpoint["resume_state"]["amp_scaler"] = {"enabled": True, "state": {}}
 
     with pytest.raises(CheckpointValidationError, match="requires a non-empty saved state"):
@@ -348,7 +349,9 @@ def _assert_nested_equal(left: Any, right: Any) -> None:
         assert left == right
 
 
-def test_interrupted_resume_matches_uninterrupted_cpu_continuation(tmp_path, tiny_config):
+def test_interrupted_resume_matches_uninterrupted_cpu_continuation(
+    tmp_path, tiny_config, checkpoint_provenance
+):
     first_steps = 3
     remaining_steps = 2
     critical = _critical_config(tiny_config)
@@ -384,6 +387,7 @@ def test_interrupted_resume_matches_uninterrupted_cpu_continuation(tmp_path, tin
         iteration=first_steps - 1,
         best_val=0.4,
         resume_state=resume_state,
+        provenance=checkpoint_provenance,
     )
     checkpoint_path = tmp_path / "resume.pt"
     torch.save(checkpoint, checkpoint_path)

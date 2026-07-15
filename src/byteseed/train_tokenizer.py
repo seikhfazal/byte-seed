@@ -9,6 +9,7 @@ import yaml
 
 from .config import load_config
 from .dataset import read_markdown_corpus
+from .provenance import tokenizer_identity_from_processor
 from .utils import ensure_dir
 
 USER_DEFINED_SYMBOLS = ["<|system|>", "<|user|>", "<|assistant|>", "<|end|>"]
@@ -47,6 +48,7 @@ def train_tokenizer(config_path: str, vocab_size: int | None = None) -> None:
         "user_defined_symbols": USER_DEFINED_SYMBOLS,
         "model_path": str(model_path),
         "corpus_path": str(corpus_path),
+        "tokenizer_identity": tokenizer_identity_from_processor(model_path, processor),
     }
     meta_path = tokenizer_dir / "tokenizer_meta.yaml"
     meta_path.write_text(yaml.safe_dump(meta, sort_keys=False), encoding="utf-8")

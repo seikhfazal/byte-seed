@@ -4,6 +4,8 @@ from pathlib import Path
 
 import sentencepiece as spm
 
+from .provenance import tokenizer_identity_from_processor
+
 
 class ByteSeedTokenizer:
     def __init__(self, tokenizer_dir: str | Path):
@@ -15,6 +17,7 @@ class ByteSeedTokenizer:
                 "Run: python -m src.byteseed.train_tokenizer --config configs/byteseed_12m.yaml"
             )
         self.sp = spm.SentencePieceProcessor(model_file=str(self.model_path))
+        self._identity: dict[str, object] | None = None
 
     @property
     def bos_id(self) -> int:
@@ -27,6 +30,13 @@ class ByteSeedTokenizer:
     @property
     def vocab_size(self) -> int:
         return self.sp.get_piece_size()
+
+    @property
+    def identity(self) -> dict[str, object]:
+        """Compute the authoritative model-byte/token-ID identity once per wrapper."""
+        if self._identity is None:
+            self._identity = tokenizer_identity_from_processor(self.model_path, self.sp)
+        return self._identity
 
     def encode(self, text: str, add_bos: bool = False, add_eos: bool = False) -> list[int]:
         ids = self.sp.encode(text, out_type=int)

@@ -11,6 +11,7 @@ from tqdm import tqdm
 from .checkpoint import CheckpointKind, build_checkpoint
 from .config import align_config_to_tokenizer, load_config
 from .generate import load_model, marker_id, stop_token_ids
+from .provenance import build_checkpoint_provenance
 from .tokenizer import ByteSeedTokenizer
 from .utils import ensure_dir, set_seed
 
@@ -136,7 +137,7 @@ def finetune(config_path: str, checkpoint: str | None, examples: str, iters: int
     tokenizer = ByteSeedTokenizer(cfg.tokenizer_dir)
     if checkpoint is None:
         cfg = align_config_to_tokenizer(cfg, tokenizer)
-    model = load_model(cfg, checkpoint)
+    model = load_model(cfg, checkpoint, tokenizer=tokenizer)
     cfg = model.config
     device = cfg.resolved_device
     data = ChatSFTDataset(examples, tokenizer, cfg.block_size, device, mask_prompt=mask_prompt)
@@ -163,6 +164,7 @@ def finetune(config_path: str, checkpoint: str | None, examples: str, iters: int
             model_state=model.state_dict(),
             config=model.config.__dict__,
             iteration=iters,
+            provenance=build_checkpoint_provenance(tokenizer.identity),
         ),
         out,
     )

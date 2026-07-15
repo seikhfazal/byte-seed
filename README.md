@@ -134,7 +134,7 @@ python scripts/benchmark_generation.py --dtype auto
 
 Training notes are documented in [docs/TRAINING_NOTES.md](docs/TRAINING_NOTES.md).
 
-Exact automatic pretraining resume uses only checkpoints with complete continuation state:
+Exact automatic pretraining resume uses only checkpoints with complete continuation state and matching tokenizer/data fingerprints:
 
 ```powershell
 python -m byteseed.pretrain --config configs/byteseed_12m.yaml --resume
@@ -146,7 +146,7 @@ Partial legacy continuation is intentionally explicit and inexact:
 python -m byteseed.pretrain --config configs/byteseed_12m.yaml --resume-checkpoint checkpoints\legacy_pretrain.pt --allow-inexact-resume
 ```
 
-The inexact option cannot restore RNG, AMP scaler, or early-stopping patience state. See the training notes for the determinism boundary.
+The inexact option also covers provenance-unverified legacy checkpoints or an explicitly accepted data-manifest change. It never bypasses a known tokenizer mismatch. See the training notes for the fingerprint contract and determinism boundary.
 
 ## Tests and CI
 

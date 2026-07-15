@@ -3,6 +3,7 @@
 import argparse
 import json
 import sys
+import warnings
 from typing import Any
 
 import torch
@@ -69,14 +70,27 @@ def _shape_mismatch_message(error: RuntimeError, model_cfg: ByteSeedConfig, ckpt
     )
 
 
-def load_model(cfg: ByteSeedConfig, checkpoint: str | None) -> GPT:
+def load_model(
+    cfg: ByteSeedConfig,
+    checkpoint: str | None,
+    *,
+    tokenizer: ByteSeedTokenizer | None = None,
+) -> GPT:
     selected = select_checkpoint(
         cfg.checkpoint_dir,
         CheckpointOperation.MODEL_LOAD,
         explicit_path=checkpoint,
+        runtime_tokenizer_identity=tokenizer.identity if tokenizer is not None else None,
     )
     if selected is None:
         raise FileNotFoundError(NO_CHECKPOINT_MESSAGE)
+    if tokenizer is not None and selected.tokenizer_verified is False:
+        warnings.warn(
+            "Checkpoint has no tokenizer fingerprint; legacy inference compatibility is "
+            "unverified rather than cryptographically confirmed.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
 
     ckpt = selected.data
     model_cfg = _model_cfg_from_checkpoint(cfg, ckpt)
@@ -131,7 +145,7 @@ def complete(
 ) -> str:
     cfg = load_config(config_path)
     tokenizer = ByteSeedTokenizer(cfg.tokenizer_dir)
-    model = load_model(cfg, checkpoint)
+    model = load_model(cfg, checkpoint, tokenizer=tokenizer)
     device = next(model.parameters()).device
     if json_mode:
         prompt = prompt + "\nReturn a compact JSON object. This mode is experimental.\n"

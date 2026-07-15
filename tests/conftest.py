@@ -50,3 +50,40 @@ def tiny_model(tiny_config):
     model = GPT(tiny_config)
     model.eval()
     return model
+
+
+@pytest.fixture
+def tokenizer_identity(tmp_path):
+    from byteseed.provenance import REQUIRED_SPECIAL_TOKENS, create_tokenizer_identity
+
+    model_path = tmp_path / "byteseed.model"
+    model_path.write_bytes(b"synthetic sentencepiece model bytes")
+    special_tokens = {token: index for index, token in enumerate(REQUIRED_SPECIAL_TOKENS)}
+    return create_tokenizer_identity(
+        model_path,
+        vocab_size=32,
+        special_tokens=special_tokens,
+    )
+
+
+@pytest.fixture
+def data_manifest(tmp_path, tokenizer_identity):
+    from byteseed.provenance import build_pretraining_data_manifest
+
+    np.save(tmp_path / "train.npy", np.arange(24, dtype=np.uint16))
+    np.save(tmp_path / "val.npy", np.arange(8, dtype=np.uint16))
+    return build_pretraining_data_manifest(
+        tmp_path,
+        tokenizer_identity=tokenizer_identity,
+        train_split=0.75,
+    )
+
+
+@pytest.fixture
+def checkpoint_provenance(tokenizer_identity, data_manifest):
+    from byteseed.provenance import build_checkpoint_provenance
+
+    return build_checkpoint_provenance(
+        tokenizer_identity,
+        data_manifest=data_manifest,
+    )

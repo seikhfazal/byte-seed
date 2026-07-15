@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+import pytest
 import torch
 
 from byteseed.generate import load_model
@@ -34,4 +37,16 @@ def test_legacy_checkpoint_without_config_remains_loadable(tmp_path, tiny_config
     loaded = load_model(tiny_config, str(checkpoint_path))
 
     assert next(loaded.parameters()).device.type == "cpu"
+    _assert_same_state(tiny_model, loaded)
+
+def test_legacy_inference_with_runtime_tokenizer_warns_as_unverified(
+    tmp_path, tiny_config, tiny_model, tokenizer_identity
+):
+    checkpoint_path = tmp_path / "legacy.pt"
+    torch.save({"model": tiny_model.state_dict()}, checkpoint_path)
+    tokenizer = SimpleNamespace(identity=tokenizer_identity)
+
+    with pytest.warns(RuntimeWarning, match="legacy inference compatibility is unverified"):
+        loaded = load_model(tiny_config, str(checkpoint_path), tokenizer=tokenizer)
+
     _assert_same_state(tiny_model, loaded)

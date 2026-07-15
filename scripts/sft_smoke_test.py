@@ -32,7 +32,7 @@ def main() -> None:
     out = finetune(args.config, checkpoint, args.examples, args.iters, output=args.output, mask_prompt=True)
     cfg = load_config(args.config)
     tokenizer = ByteSeedTokenizer(cfg.tokenizer_dir)
-    model = load_model(cfg, str(out))
+    model = load_model(cfg, str(out), tokenizer=tokenizer)
     model.eval()
 
     prompts = [

@@ -92,7 +92,7 @@ def main() -> None:
 
     cfg = load_config(args.config)
     tokenizer = ByteSeedTokenizer(cfg.tokenizer_dir)
-    model = load_model(cfg, args.checkpoint)
+    model = load_model(cfg, args.checkpoint, tokenizer=tokenizer)
     device = next(model.parameters()).device
     dtype_name = resolve_dtype(args.dtype, device)
     model = apply_inference_dtype(model, dtype_name)

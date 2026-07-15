@@ -33,6 +33,8 @@ PR 3 adds deterministic coverage for checkpoint schema metadata, kind-aware pret
 
 PR 4 adds deterministic CPU coverage for exact pretraining continuation state. Tests capture and restore Python and PyTorch CPU RNG state, exercise optional all-device CUDA RNG handling with test doubles, round-trip enabled and disabled scaler state, preserve early-stopping patience, validate training-critical configuration, and migrate nested optimizer tensor state. A tiny dropout/AdamW test compares uninterrupted training with an interrupted, serialized, reconstructed, and resumed run; final parameters, optimizer state, progress, and subsequent random samples must match. Legacy Anchor-like inference fixtures remain covered, while partial legacy pretraining continuation requires explicit opt-in.
 
+PR 5 adds deterministic coverage for bounded, streaming SHA-256 file hashing; path-independent tokenizer identity; same-sized tokenizer files with different bytes or special-token IDs; canonical data-manifest ordering and path normalization; and byte, split, and preprocessing changes. Exact-resume tests require matching tokenizer, training-corpus, validation-corpus, and split identity. Automatic selection skips newer mismatched checkpoints, explicit mismatch never falls back, precomputed provenance is reused without rehashing at checkpoint save, and legacy Anchor-like inference remains loadable with an explicit unverified-compatibility warning.
+
 The suite currently has no known strict expected failures.
 
 Later defect-fix PRs must remove the relevant `xfail` marker, retain the focused assertion, and add any boundary coverage needed for the corrected behavior. Do not silently turn a known defect into a passing compatibility expectation.

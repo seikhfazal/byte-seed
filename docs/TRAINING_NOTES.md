@@ -32,20 +32,26 @@ Useful anchor checkpoints produced during development:
 - `checkpoints/anchor_v2_2_finetuned.pt`
 - `checkpoints/anchor_v2_3_finetuned.pt`
 
-## Checkpoint Metadata, Selection, And Exact Pretraining Resume
+## Checkpoint Metadata, Provenance, Selection, And Exact Pretraining Resume
 
 - Checkpoint container schema version `1` identifies each checkpoint as `pretrain`, `sft`, or `model_only`.
+- Checkpoint provenance version `1` uses SHA-256 identities. The checkpoint container remains schema version `1`; model state-dict keys and architecture are unchanged.
+- `tokenizer/byteseed.model` is authoritative because its bytes define the SentencePiece token-to-ID mapping. Tokenizer identity version `1` records its byte size and SHA-256, the effective vocabulary size, all required special-token IDs, and a canonical digest. The optional `.vocab` text file is not required for inference compatibility.
+- Data-manifest version `1` fingerprints the artifacts pretraining actually consumes: `train.npy` and `val.npy`. Each record contains a logical role/name, byte size, SHA-256, token count, NumPy dtype, and format. The manifest also contains tokenizer identity plus preprocessing identity for BOS/EOS handling and the contiguous token-fraction split. Data preparation writes `data_manifest.json` beside those arrays, while pretraining recomputes the current in-memory contract once from the consumed bytes before checkpoint selection.
+- The combined manifest digest is SHA-256 over compact UTF-8 JSON with sorted keys, deterministic artifact ordering, normalized forward-slash logical names, and `NaN` disabled. Absolute paths, filesystem timestamps, and informational metadata do not participate in identity.
 - New production pretraining checkpoints contain a nested exact-resume block with resume-state version `1`. SFT and model-only checkpoints are not marked exact-pretraining-resumable.
-- Automatic pretraining resume selects only complete exact-resume checkpoints. A newer SFT, model-only, or partial legacy checkpoint cannot displace a compatible exact pretraining checkpoint, and automatic selection never silently downgrades to partial continuation.
+- Automatic pretraining resume selects only checkpoints with complete execution state and matching tokenizer/data provenance. A newer SFT, model-only, partial legacy, tokenizer-mismatched, or corpus-mismatched checkpoint cannot displace a compatible exact pretraining checkpoint, and automatic selection never silently downgrades to inexact continuation.
 - The exact state contains Python RNG state, PyTorch CPU RNG state, all initialized CUDA-device RNG states when CUDA is active, AMP GradScaler enablement/state, best validation loss, remaining early-stopping patience, and a training-critical configuration snapshot.
 - Pretraining currently has no dedicated `torch.Generator`, and NumPy is used to load processed arrays rather than to make random training decisions, so no separate generator or NumPy RNG state is serialized.
 - `iter` means the last fully completed optimizer step, including any evaluation and early-stopping update associated with that step. Resume starts at `iter + 1`, preserving learning-rate, evaluation, and checkpoint cadence without repeating or skipping a step.
 - A checkpoint is captured after `optimizer.step()`, `GradScaler.update()`, evaluation, and early-stopping state updates. Its RNG state therefore describes the next operation after that coherent continuation point.
 - On exact resume, ByteSeed constructs the dataset, model, optimizer, and scaler; loads model/optimizer/scaler state; moves nested optimizer tensors to the parameter device; validates configuration; and restores RNG state last, immediately before the first resumed batch draw.
-- Exact resume validates architecture and training settings, including block/model dimensions, dropout, batch and accumulation sizes, AdamW settings, learning rate/schedule, weight decay, warm-up, evaluation cadence, maximum iterations, seed, data path, device type, AMP mode, and early-stopping patience. Differing fields fail clearly. The checkpoint's effective model vocabulary remains authoritative because tokenizer/corpus identity validation is deferred to PR 5.
-- `--resume-checkpoint` selects one explicit checkpoint and never falls back. A partial PR 3 or legacy pretraining checkpoint fails by default.
-- Partial continuation is available only with both an explicit path and `--allow-inexact-resume`; it prints a prominent warning because RNG, scaler, and patience state cannot be reconstructed. It is not described as exact resume.
-- Legacy Anchor-like checkpoints remain loadable for inference. Structurally complete legacy pretraining checkpoints remain recognizable for explicit inexact continuation.
+- Exact resume validates architecture and training settings, including block/model dimensions, dropout, batch and accumulation sizes, AdamW settings, learning rate/schedule, weight decay, warm-up, evaluation cadence, maximum iterations, seed, device type, AMP mode, and early-stopping patience. Machine-specific data paths are not identity fields; tokenizer bytes, corpus bytes, and split/preprocessing identity are validated through the manifest instead. Differing critical fields fail clearly.
+- `--resume-checkpoint` selects one explicit checkpoint and never falls back. A PR 4 state-complete checkpoint without provenance, a partial PR 3 checkpoint, or a legacy pretraining checkpoint fails exact resume by default.
+- Inexact continuation is available only with both an explicit path and `--allow-inexact-resume`. Missing execution state or missing/data-mismatched provenance produces a prominent warning and is never described as exact. A known tokenizer mismatch is always rejected, even with this opt-in.
+- Legacy Anchor-like checkpoints remain loadable for inference and are identified with a focused warning as unverified rather than cryptographically compatible. Structurally complete legacy pretraining checkpoints remain recognizable for explicit inexact continuation.
+- New pretraining checkpoints store tokenizer identity, the complete data manifest, and its combined digest. New SFT checkpoints store tokenizer identity. `model_only` checkpoints can store tokenizer identity when their save caller has it; no production model-only save path fabricates provenance.
+- Tokenizer and data identities are computed once during startup and reused for selection, diagnostics, and all checkpoint saves. They are not recomputed per batch, evaluation, checkpoint save, or generated token.
 - SFT initializes from compatible model weights; interrupted-SFT exact resume is outside this pretraining-only change.
 
 Exact automatic resume:
@@ -60,7 +66,7 @@ Explicit inexact continuation from a partial legacy checkpoint:
 python -m byteseed.pretrain --config configs/byteseed_12m.yaml --resume-checkpoint checkpoints\legacy_pretrain.pt --allow-inexact-resume
 ```
 
-The exact-resume guarantee is intentionally bounded: with the same supported software/hardware conditions, deterministic operations, training-critical configuration, and unchanged data/tokenizer identity, continuation restores the same next stochastic and optimizer state. It does not promise bitwise identity across CPU and CUDA, different GPUs, different PyTorch/CUDA versions, nondeterministic kernels, or changed data/tokenizers. Stable tokenizer and corpus fingerprints are deferred to PR 5.
+The exact-resume guarantee is intentionally bounded: with the same supported software/hardware conditions, deterministic operations, matching training-critical configuration, and matching tokenizer/data manifests, continuation restores the same next stochastic and optimizer state. It does not promise bitwise identity across CPU and CUDA, different GPUs, different PyTorch/CUDA versions, nondeterministic kernels, or changed data/tokenizers.
 
 ## Current Stable Checkpoint
 

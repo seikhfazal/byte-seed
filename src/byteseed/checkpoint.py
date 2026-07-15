@@ -10,6 +10,13 @@ from typing import Any
 
 import torch
 
+from .provenance import (
+    ProvenanceMismatchError,
+    ProvenanceValidationError,
+    compare_data_manifests,
+    compare_tokenizer_identities,
+    validate_checkpoint_provenance,
+)
 
 CHECKPOINT_VERSION = 1
 RESUME_STATE_VERSION = 1
@@ -29,8 +36,6 @@ TRAINING_CRITICAL_CONFIG_FIELDS = (
     "eval_iters",
     "weight_decay",
     "warmup_iters",
-    "processed_data_dir",
-    "train_split",
     "seed",
     "early_stopping_patience",
 )
@@ -94,6 +99,7 @@ class LoadedCheckpoint:
     path: Path
     data: dict[str, Any]
     info: CheckpointInfo
+    tokenizer_verified: bool | None = None
 
 
 def build_checkpoint(
@@ -105,6 +111,7 @@ def build_checkpoint(
     optimizer_state: Mapping[str, Any] | None = None,
     best_val: float | None = None,
     resume_state: Mapping[str, Any] | None = None,
+    provenance: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a version-1 checkpoint while retaining ByteSeed's legacy payload keys."""
     checkpoint_kind = _coerce_kind(kind)
@@ -124,6 +131,26 @@ def build_checkpoint(
         if checkpoint_kind is not CheckpointKind.PRETRAIN:
             raise ValueError("Only pretraining checkpoints may contain exact resume state.")
         data["resume_state"] = dict(resume_state)
+    if provenance is not None:
+        if (
+            checkpoint_kind is not CheckpointKind.PRETRAIN
+            and isinstance(provenance, Mapping)
+            and (
+                "data_manifest" in provenance
+                or "data_manifest_digest" in provenance
+            )
+        ):
+            raise ValueError(
+                f"{checkpoint_kind.value} checkpoints may contain tokenizer provenance only."
+            )
+        try:
+            validate_checkpoint_provenance(
+                provenance,
+                require_data=checkpoint_kind is CheckpointKind.PRETRAIN,
+            )
+        except ProvenanceValidationError as exc:
+            raise ValueError(f"Invalid checkpoint provenance: {exc}") from exc
+        data["provenance"] = dict(provenance)
 
     required = {
         CheckpointKind.PRETRAIN: ("optimizer", "iter"),
@@ -276,7 +303,7 @@ def build_resume_state(
     }
 
 
-def validate_exact_resume_checkpoint(data: Mapping[str, Any]) -> Mapping[str, Any]:
+def validate_state_complete_checkpoint(data: Mapping[str, Any]) -> Mapping[str, Any]:
     """Validate and return the exact-resume block of a pretraining checkpoint."""
     info = classify_checkpoint(data)
     if info.kind is not CheckpointKind.PRETRAIN:
@@ -375,11 +402,129 @@ def validate_exact_resume_checkpoint(data: Mapping[str, Any]) -> Mapping[str, An
     return resume_state
 
 
-def is_exact_resumable(data: Mapping[str, Any]) -> bool:
+def validate_exact_resume_checkpoint(
+    data: Mapping[str, Any],
+    *,
+    runtime_tokenizer_identity: Mapping[str, Any] | None = None,
+    runtime_data_manifest: Mapping[str, Any] | None = None,
+) -> Mapping[str, Any]:
+    """Require complete PR 4 state plus valid PR 5 tokenizer/data provenance."""
+    resume_state = validate_state_complete_checkpoint(data)
+    provenance = _validated_checkpoint_provenance_record(data, require_data=False)
+    if "data_manifest" not in provenance:
+        raise CheckpointCompatibilityError(
+            "Checkpoint is state-complete but provenance-unverified; exact pretraining "
+            "resume requires a data manifest. Use explicit --allow-inexact-resume only "
+            "when partial continuation is intentional."
+        )
+    if (runtime_tokenizer_identity is None) != (runtime_data_manifest is None):
+        raise CheckpointCompatibilityError(
+            "Exact pretraining resume requires both runtime tokenizer identity and data manifest."
+        )
+    if runtime_tokenizer_identity is not None and runtime_data_manifest is not None:
+        validate_checkpoint_tokenizer_compatibility(
+            data,
+            runtime_tokenizer_identity,
+            CheckpointOperation.PRETRAIN_EXACT_RESUME,
+            require=True,
+        )
+        validate_checkpoint_data_compatibility(
+            data,
+            runtime_data_manifest,
+            CheckpointOperation.PRETRAIN_EXACT_RESUME,
+            require=True,
+        )
+    return resume_state
+
+
+def is_state_complete(data: Mapping[str, Any]) -> bool:
     try:
-        validate_exact_resume_checkpoint(data)
+        validate_state_complete_checkpoint(data)
     except CheckpointError:
         return False
+    return True
+
+
+def is_exact_resumable(
+    data: Mapping[str, Any],
+    *,
+    runtime_tokenizer_identity: Mapping[str, Any] | None = None,
+    runtime_data_manifest: Mapping[str, Any] | None = None,
+) -> bool:
+    try:
+        validate_exact_resume_checkpoint(
+            data,
+            runtime_tokenizer_identity=runtime_tokenizer_identity,
+            runtime_data_manifest=runtime_data_manifest,
+        )
+    except CheckpointError:
+        return False
+    return True
+
+
+def validate_checkpoint_tokenizer_compatibility(
+    data: Mapping[str, Any],
+    runtime_identity: Mapping[str, Any],
+    operation: CheckpointOperation,
+    *,
+    require: bool,
+) -> bool:
+    provenance = data.get("provenance")
+    if provenance is None:
+        if require:
+            raise CheckpointCompatibilityError(
+                f"Checkpoint is incompatible with requested operation '{operation.value}'; "
+                "tokenizer provenance is missing."
+            )
+        return False
+    validated = _validated_checkpoint_provenance_record(data, require_data=False)
+    try:
+        compare_tokenizer_identities(validated["tokenizer"], runtime_identity)
+    except ProvenanceMismatchError as exc:
+        raise CheckpointCompatibilityError(
+            f"Checkpoint is incompatible with requested operation '{operation.value}'; {exc}"
+        ) from exc
+    except ProvenanceValidationError as exc:
+        raise CheckpointValidationError(
+            f"Runtime tokenizer identity is invalid for '{operation.value}': {exc}"
+        ) from exc
+    return True
+
+
+def validate_checkpoint_data_compatibility(
+    data: Mapping[str, Any],
+    runtime_manifest: Mapping[str, Any],
+    operation: CheckpointOperation,
+    *,
+    require: bool,
+) -> bool:
+    provenance = data.get("provenance")
+    if provenance is None:
+        if require:
+            raise CheckpointCompatibilityError(
+                f"Checkpoint is incompatible with requested operation '{operation.value}'; "
+                "data provenance is missing."
+            )
+        return False
+    validated = _validated_checkpoint_provenance_record(data, require_data=False)
+    checkpoint_manifest = validated.get("data_manifest")
+    if checkpoint_manifest is None:
+        if require:
+            raise CheckpointCompatibilityError(
+                f"Checkpoint is incompatible with requested operation '{operation.value}'; "
+                "data_manifest is missing."
+            )
+        return False
+    try:
+        compare_data_manifests(checkpoint_manifest, runtime_manifest)
+    except ProvenanceMismatchError as exc:
+        raise CheckpointCompatibilityError(
+            f"Checkpoint is incompatible with requested operation '{operation.value}'; {exc}"
+        ) from exc
+    except ProvenanceValidationError as exc:
+        raise CheckpointValidationError(
+            f"Runtime data manifest is invalid for '{operation.value}': {exc}"
+        ) from exc
     return True
 
 
@@ -442,6 +587,8 @@ def load_checkpoint(
     operation: CheckpointOperation,
     *,
     map_location: str | torch.device = "cpu",
+    runtime_tokenizer_identity: Mapping[str, Any] | None = None,
+    runtime_data_manifest: Mapping[str, Any] | None = None,
 ) -> LoadedCheckpoint:
     """Load and validate an explicit checkpoint without any fallback behavior."""
     checkpoint_path = Path(path)
@@ -451,8 +598,20 @@ def load_checkpoint(
         )
     data = _read_checkpoint(checkpoint_path, map_location=map_location)
     info = classify_checkpoint(data)
-    _require_compatible(data, info, operation, checkpoint_path)
-    return LoadedCheckpoint(path=checkpoint_path, data=data, info=info)
+    tokenizer_verified = _require_compatible(
+        data,
+        info,
+        operation,
+        checkpoint_path,
+        runtime_tokenizer_identity=runtime_tokenizer_identity,
+        runtime_data_manifest=runtime_data_manifest,
+    )
+    return LoadedCheckpoint(
+        path=checkpoint_path,
+        data=data,
+        info=info,
+        tokenizer_verified=tokenizer_verified,
+    )
 
 
 def discover_checkpoint(
@@ -460,13 +619,23 @@ def discover_checkpoint(
     operation: CheckpointOperation,
     *,
     map_location: str | torch.device = "cpu",
+    runtime_tokenizer_identity: Mapping[str, Any] | None = None,
+    runtime_data_manifest: Mapping[str, Any] | None = None,
 ) -> LoadedCheckpoint | None:
     """Find the best compatible checkpoint, ignoring corrupt or incompatible candidates."""
     directory = Path(checkpoint_dir)
     candidates: list[LoadedCheckpoint] = []
     for path in sorted(directory.glob("*.pt"), key=_normalized_path):
         try:
-            candidates.append(load_checkpoint(path, operation, map_location=map_location))
+            candidates.append(
+                load_checkpoint(
+                    path,
+                    operation,
+                    map_location=map_location,
+                    runtime_tokenizer_identity=runtime_tokenizer_identity,
+                    runtime_data_manifest=runtime_data_manifest,
+                )
+            )
         except (CheckpointError, FileNotFoundError):
             continue
     if not candidates:
@@ -480,11 +649,25 @@ def select_checkpoint(
     *,
     explicit_path: str | Path | None = None,
     map_location: str | torch.device = "cpu",
+    runtime_tokenizer_identity: Mapping[str, Any] | None = None,
+    runtime_data_manifest: Mapping[str, Any] | None = None,
 ) -> LoadedCheckpoint | None:
     """Honor an explicit path or deterministically discover a compatible checkpoint."""
     if explicit_path is not None:
-        return load_checkpoint(explicit_path, operation, map_location=map_location)
-    return discover_checkpoint(checkpoint_dir, operation, map_location=map_location)
+        return load_checkpoint(
+            explicit_path,
+            operation,
+            map_location=map_location,
+            runtime_tokenizer_identity=runtime_tokenizer_identity,
+            runtime_data_manifest=runtime_data_manifest,
+        )
+    return discover_checkpoint(
+        checkpoint_dir,
+        operation,
+        map_location=map_location,
+        runtime_tokenizer_identity=runtime_tokenizer_identity,
+        runtime_data_manifest=runtime_data_manifest,
+    )
 
 
 def _read_checkpoint(
@@ -503,14 +686,48 @@ def _read_checkpoint(
     return dict(raw)
 
 
+def _validated_checkpoint_provenance_record(
+    data: Mapping[str, Any],
+    *,
+    require_data: bool,
+) -> Mapping[str, Any]:
+    provenance = data.get("provenance")
+    if provenance is None:
+        raise CheckpointCompatibilityError(
+            "Checkpoint is provenance-unverified; tokenizer/data identity is missing."
+        )
+    if not isinstance(provenance, Mapping):
+        raise CheckpointValidationError("Checkpoint provenance must be a mapping.")
+    try:
+        validate_checkpoint_provenance(provenance, require_data=require_data)
+    except ProvenanceValidationError as exc:
+        raise CheckpointValidationError(f"Checkpoint provenance is invalid: {exc}") from exc
+    return provenance
+
+
 def _require_compatible(
     data: Mapping[str, Any],
     info: CheckpointInfo,
     operation: CheckpointOperation,
     path: Path,
-) -> None:
+    *,
+    runtime_tokenizer_identity: Mapping[str, Any] | None,
+    runtime_data_manifest: Mapping[str, Any] | None,
+) -> bool | None:
+    if "provenance" in data:
+        _validated_checkpoint_provenance_record(
+            data,
+            require_data=info.kind is CheckpointKind.PRETRAIN,
+        )
     if operation is CheckpointOperation.MODEL_LOAD:
-        return
+        if runtime_tokenizer_identity is None:
+            return None
+        return validate_checkpoint_tokenizer_compatibility(
+            data,
+            runtime_tokenizer_identity,
+            operation,
+            require=False,
+        )
 
     missing = [field for field in ("model", "optimizer", "config", "iter") if field not in data]
     invalid: list[str] = []
@@ -534,8 +751,27 @@ def _require_compatible(
             + "."
         )
 
+    tokenizer_verified: bool | None = None
+    if runtime_tokenizer_identity is not None:
+        tokenizer_verified = validate_checkpoint_tokenizer_compatibility(
+            data,
+            runtime_tokenizer_identity,
+            operation,
+            require=False,
+        )
+
     if operation is CheckpointOperation.PRETRAIN_EXACT_RESUME:
-        validate_exact_resume_checkpoint(data)
+        if runtime_tokenizer_identity is None or runtime_data_manifest is None:
+            raise CheckpointCompatibilityError(
+                "Exact pretraining resume requires the current tokenizer identity and data manifest."
+            )
+        validate_exact_resume_checkpoint(
+            data,
+            runtime_tokenizer_identity=runtime_tokenizer_identity,
+            runtime_data_manifest=runtime_data_manifest,
+        )
+        return True
+    return tokenizer_verified
 
 
 def _validate_model_state(data: Mapping[str, Any]) -> None:
@@ -673,13 +909,15 @@ def _normalized_path(path: Path) -> str:
 def _selection_key(
     checkpoint: LoadedCheckpoint,
     operation: CheckpointOperation,
-) -> tuple[int, str]:
+) -> tuple[int, int, str]:
     normalized_path = _normalized_path(checkpoint.path)
     if operation in {
         CheckpointOperation.PRETRAIN_RESUME,
         CheckpointOperation.PRETRAIN_EXACT_RESUME,
     }:
         # Progress is comparable; normalized path is the equal-progress tie-breaker.
-        return checkpoint.info.progress or 0, normalized_path
-    # Iterations are not comparable across pretraining and stage-local SFT/model loading.
-    return checkpoint.path.stat().st_mtime_ns, normalized_path
+        return 0, checkpoint.info.progress or 0, normalized_path
+    # Prefer cryptographically verified tokenizer matches, but retain legacy inference
+    # fallback. Iterations are not comparable across stage-local/model checkpoints.
+    verified_rank = 1 if checkpoint.tokenizer_verified is True else 0
+    return verified_rank, checkpoint.path.stat().st_mtime_ns, normalized_path

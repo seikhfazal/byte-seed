@@ -122,7 +122,7 @@ def main() -> None:
     cfg = load_config(args.config)
     tokenizer = ByteSeedTokenizer(cfg.tokenizer_dir)
     checkpoint = args.checkpoint or default_checkpoint()
-    model = load_model(cfg, checkpoint)
+    model = load_model(cfg, checkpoint, tokenizer=tokenizer)
 
     passed = 0
     print(f"checkpoint: {checkpoint}")

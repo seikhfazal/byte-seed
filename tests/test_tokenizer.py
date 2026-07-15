@@ -61,3 +61,29 @@ def test_tokenizer_wrapper_forwards_to_processor_without_a_real_binary(monkeypat
 def test_missing_tokenizer_file_has_clear_error(tmp_path):
     with pytest.raises(FileNotFoundError, match="Tokenizer file missing"):
         ByteSeedTokenizer(tmp_path)
+
+def test_tokenizer_identity_is_computed_once_per_wrapper(monkeypatch, tmp_path):
+    tokenizer_path = tmp_path / "byteseed.model"
+    tokenizer_path.write_bytes(b"synthetic tokenizer")
+    monkeypatch.setattr(
+        tokenizer_module.spm,
+        "SentencePieceProcessor",
+        FakeSentencePieceProcessor,
+    )
+    calls = []
+    identity = {"digest": "a" * 64}
+
+    def build_identity(model_path, processor):
+        calls.append((model_path, processor))
+        return identity
+
+    monkeypatch.setattr(
+        tokenizer_module,
+        "tokenizer_identity_from_processor",
+        build_identity,
+    )
+    tokenizer = ByteSeedTokenizer(tmp_path)
+
+    assert tokenizer.identity is identity
+    assert tokenizer.identity is identity
+    assert len(calls) == 1

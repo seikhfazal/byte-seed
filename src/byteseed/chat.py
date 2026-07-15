@@ -296,7 +296,7 @@ def run_chat(args: argparse.Namespace) -> None:
     cfg = load_config(args.config)
     tokenizer = ByteSeedTokenizer(cfg.tokenizer_dir)
     checkpoint_label = resolve_checkpoint_label(args.config, args.checkpoint)
-    model = load_model(cfg, args.checkpoint)
+    model = load_model(cfg, args.checkpoint, tokenizer=tokenizer)
     device = next(model.parameters()).device
     dtype_name = resolve_dtype(args.dtype, device)
     model = apply_inference_dtype(model, dtype_name)

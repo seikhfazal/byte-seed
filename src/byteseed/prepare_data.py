@@ -6,6 +6,7 @@ import numpy as np
 
 from .config import load_config
 from .dataset import read_markdown_corpus
+from .provenance import build_pretraining_data_manifest, write_data_manifest
 from .tokenizer import ByteSeedTokenizer
 from .utils import ensure_dir, set_seed, warn_if_tiny_dataset
 
@@ -21,6 +22,12 @@ def prepare_data(config_path: str) -> None:
     processed_dir = ensure_dir(cfg.processed_data_dir)
     np.save(processed_dir / "train.npy", np.array(ids[:split_idx], dtype=np.uint16 if cfg.vocab_size <= 65535 else np.int32))
     np.save(processed_dir / "val.npy", np.array(ids[split_idx:], dtype=np.uint16 if cfg.vocab_size <= 65535 else np.int32))
+    manifest = build_pretraining_data_manifest(
+        processed_dir,
+        tokenizer_identity=tokenizer.identity,
+        train_split=cfg.train_split,
+    )
+    write_data_manifest(processed_dir / "data_manifest.json", manifest)
     warn_if_tiny_dataset(len(ids), cfg.block_size)
     print(f"Saved {split_idx} train tokens and {len(ids) - split_idx} validation tokens to {processed_dir}.")
 

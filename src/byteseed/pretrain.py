@@ -26,6 +26,7 @@ from .checkpoint import (
 from .config import align_config_to_tokenizer, config_from_checkpoint, load_config
 from .dataset import load_processed
 from .model import GPT
+from .provenance import build_checkpoint_provenance, build_pretraining_data_manifest
 from .tokenizer import ByteSeedTokenizer
 from .utils import ensure_dir, set_seed
 
@@ -84,33 +85,43 @@ def resolve_resume_checkpoint(
     *,
     explicit_path: str | Path | None,
     allow_inexact_resume: bool,
+    runtime_tokenizer_identity: dict[str, Any],
+    runtime_data_manifest: dict[str, Any],
 ) -> tuple[LoadedCheckpoint | None, dict[str, Any] | None]:
-    """Resolve exact resume by default; permit partial continuation only explicitly."""
+    """Resolve provenance-verified exact resume; allow explicit inexact continuation."""
     if allow_inexact_resume and explicit_path is None:
         raise ValueError(
             "--allow-inexact-resume requires --resume-checkpoint with an explicit path."
         )
 
     if explicit_path is not None:
+        # Structural loading validates any known tokenizer identity first. A known
+        # tokenizer mismatch is never eligible for the inexact-resume exception.
         selected = select_checkpoint(
             checkpoint_dir,
             CheckpointOperation.PRETRAIN_RESUME,
             explicit_path=explicit_path,
+            runtime_tokenizer_identity=runtime_tokenizer_identity,
         )
         assert selected is not None
         try:
-            resume_state = dict(validate_exact_resume_checkpoint(selected.data))
+            resume_state = dict(
+                validate_exact_resume_checkpoint(
+                    selected.data,
+                    runtime_tokenizer_identity=runtime_tokenizer_identity,
+                    runtime_data_manifest=runtime_data_manifest,
+                )
+            )
         except CheckpointCompatibilityError as exc:
             if not allow_inexact_resume:
                 raise CheckpointCompatibilityError(
-                    f"Checkpoint {selected.path} is only a partial pretraining continuation: {exc} "
-                    "Use --allow-inexact-resume with this explicit path to accept missing "
-                    "RNG/scaler/early-stopping state."
+                    f"Checkpoint {selected.path} is only an inexact pretraining continuation: "
+                    f"{exc} Use --allow-inexact-resume with this explicit path to accept "
+                    "missing execution/data provenance or a changed data manifest."
                 ) from exc
             print(
                 "WARNING: inexact pretraining resume explicitly enabled. "
-                "Model/optimizer/progress will continue, but missing RNG, AMP scaler, and "
-                "early-stopping patience state cannot be restored."
+                f"The continuation is not exact because: {exc}"
             )
             return selected, None
         return selected, resume_state
@@ -118,20 +129,42 @@ def resolve_resume_checkpoint(
     selected = select_checkpoint(
         checkpoint_dir,
         CheckpointOperation.PRETRAIN_EXACT_RESUME,
+        runtime_tokenizer_identity=runtime_tokenizer_identity,
+        runtime_data_manifest=runtime_data_manifest,
     )
     if selected is not None:
-        return selected, dict(validate_exact_resume_checkpoint(selected.data))
+        return selected, dict(
+            validate_exact_resume_checkpoint(
+                selected.data,
+                runtime_tokenizer_identity=runtime_tokenizer_identity,
+                runtime_data_manifest=runtime_data_manifest,
+            )
+        )
 
     partial = select_checkpoint(
         checkpoint_dir,
         CheckpointOperation.PRETRAIN_RESUME,
+        runtime_tokenizer_identity=runtime_tokenizer_identity,
     )
     if partial is not None:
         raise CheckpointCompatibilityError(
-            "Automatic resume found structurally resumable checkpoints but none with complete "
-            "exact resume state. Automatic resume never downgrades to partial continuation; "
-            f"choose an explicit path such as {partial.path} together with "
-            "--allow-inexact-resume if that tradeoff is intentional."
+            "Automatic resume found structurally resumable checkpoints but none with complete, "
+            "matching execution and data provenance. Automatic resume never downgrades to "
+            f"inexact continuation; choose an explicit path such as {partial.path} together "
+            "with --allow-inexact-resume if that tradeoff is intentional."
+        )
+
+    # If structural candidates exist only without runtime tokenizer validation, they
+    # are known tokenizer mismatches (or malformed provenance), not a clean no-resume case.
+    incompatible = select_checkpoint(
+        checkpoint_dir,
+        CheckpointOperation.PRETRAIN_RESUME,
+    )
+    if incompatible is not None:
+        raise CheckpointCompatibilityError(
+            "Automatic resume found pretraining checkpoints, but none is compatible with "
+            "the current tokenizer identity. Automatic resume did not start fresh or "
+            "silently downgrade."
         )
     return None, None
 
@@ -144,12 +177,28 @@ def train(
     allow_inexact_resume: bool = False,
 ) -> Path:
     cfg = load_config(config_path, {"max_iters": max_iters})
-    requested_cfg = cfg
     if allow_inexact_resume and resume_checkpoint is None:
         raise ValueError(
             "--allow-inexact-resume requires --resume-checkpoint with an explicit path."
         )
     set_seed(cfg.seed)
+    tokenizer = ByteSeedTokenizer(cfg.tokenizer_dir)
+    cfg = align_config_to_tokenizer(cfg, tokenizer)
+    requested_cfg = cfg
+
+    # Compute immutable provenance once. Selection, validation, and every checkpoint
+    # save reuse these records; large token arrays are never rehashed in the loop.
+    runtime_tokenizer_identity = tokenizer.identity
+    runtime_data_manifest = build_pretraining_data_manifest(
+        cfg.processed_data_dir,
+        tokenizer_identity=runtime_tokenizer_identity,
+        train_split=cfg.train_split,
+    )
+    checkpoint_provenance = build_checkpoint_provenance(
+        runtime_tokenizer_identity,
+        data_manifest=runtime_data_manifest,
+    )
+
     checkpoint_dir = ensure_dir(cfg.checkpoint_dir)
     ckpt = None
     exact_resume_state = None
@@ -161,11 +210,20 @@ def train(
             checkpoint_dir,
             explicit_path=resume_checkpoint,
             allow_inexact_resume=allow_inexact_resume,
+            runtime_tokenizer_identity=runtime_tokenizer_identity,
+            runtime_data_manifest=runtime_data_manifest,
         )
         if selected is not None:
             ckpt_path = selected.path
             ckpt = selected.data
-            cfg = config_from_checkpoint(ckpt.get("config", cfg.__dict__), fallback_device=cfg.device)
+            cfg = config_from_checkpoint(
+                ckpt.get("config", cfg.__dict__), fallback_device=cfg.device
+            )
+            # Runtime artifact locations come from the current invocation. Their bytes and
+            # split identity, rather than machine-specific paths, govern exact compatibility.
+            cfg.tokenizer_dir = requested_cfg.tokenizer_dir
+            cfg.processed_data_dir = requested_cfg.processed_data_dir
+            cfg.train_split = requested_cfg.train_split
             if max_iters is not None:
                 cfg.max_iters = int(max_iters)
             # iter is the last optimizer step whose evaluation/control updates are complete.
@@ -178,20 +236,11 @@ def train(
                     device_type=requested_device,
                     amp_enabled=requested_device == "cuda",
                 )
-                # The configured vocabulary is only a tokenizer-training target. The effective
-                # model vocabulary comes from the checkpoint until PR 5 adds tokenizer identity.
-                requested_critical["vocab_size"] = exact_resume_state["training_config"][
-                    "vocab_size"
-                ]
                 validate_training_config(
                     exact_resume_state["training_config"],
                     requested_critical,
                 )
             print(f"Resumed from {ckpt_path}; checkpoint config is being used for model shape.")
-
-    if ckpt is None:
-        tokenizer = ByteSeedTokenizer(cfg.tokenizer_dir)
-        cfg = align_config_to_tokenizer(cfg, tokenizer)
 
     device = cfg.resolved_device
     train_data, val_data = load_processed(cfg.processed_data_dir, cfg.block_size, device)
@@ -271,6 +320,7 @@ def train(
                 iteration=step,
                 best_val=best_val,
                 resume_state=resume_state,
+                provenance=checkpoint_provenance,
             )
             torch.save(
                 payload,

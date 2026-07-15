@@ -76,7 +76,7 @@ def main() -> None:
 
     cfg = load_config(args.config)
     tokenizer = ByteSeedTokenizer(cfg.tokenizer_dir)
-    model = load_model(cfg, args.checkpoint)
+    model = load_model(cfg, args.checkpoint, tokenizer=tokenizer)
 
     print(f"checkpoint: {args.checkpoint}")
     print(f"temperature: {args.temperature:g} | top_k: {args.top_k} | max_new_tokens: {args.max_new_tokens}")

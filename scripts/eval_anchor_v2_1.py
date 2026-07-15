@@ -97,7 +97,7 @@ def main() -> None:
 
     cfg = load_config(args.config)
     tokenizer = ByteSeedTokenizer(cfg.tokenizer_dir)
-    model = load_model(cfg, args.checkpoint)
+    model = load_model(cfg, args.checkpoint, tokenizer=tokenizer)
 
     passed = 0
     print(f"checkpoint: {args.checkpoint}")

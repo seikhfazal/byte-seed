@@ -41,7 +41,9 @@ def _partial_checkpoint(tiny_config, iteration: int) -> dict[str, object]:
     )
 
 
-def _exact_checkpoint(tiny_config, iteration: int) -> dict[str, object]:
+def _exact_checkpoint(
+    tiny_config, iteration: int, checkpoint_provenance
+) -> dict[str, object]:
     critical = training_config_snapshot(
         tiny_config.__dict__,
         device_type="cpu",
@@ -61,6 +63,7 @@ def _exact_checkpoint(tiny_config, iteration: int) -> dict[str, object]:
         iteration=iteration,
         best_val=0.5,
         resume_state=resume_state,
+        provenance=checkpoint_provenance,
     )
 
 
@@ -69,15 +72,36 @@ def _save(path: Path, payload: object) -> Path:
     return path
 
 
+def _resolve(
+    checkpoint_dir,
+    *,
+    checkpoint_provenance,
+    explicit_path,
+    allow_inexact_resume,
+):
+    return resolve_resume_checkpoint(
+        checkpoint_dir,
+        explicit_path=explicit_path,
+        allow_inexact_resume=allow_inexact_resume,
+        runtime_tokenizer_identity=checkpoint_provenance["tokenizer"],
+        runtime_data_manifest=checkpoint_provenance["data_manifest"],
+    )
+
+
 def test_auto_resume_selects_exact_checkpoint_over_higher_progress_partial(
     tmp_path,
     tiny_config,
+    checkpoint_provenance,
 ):
-    exact_path = _save(tmp_path / "exact.pt", _exact_checkpoint(tiny_config, 4))
+    exact_path = _save(
+        tmp_path / "exact.pt",
+        _exact_checkpoint(tiny_config, 4, checkpoint_provenance),
+    )
     _save(tmp_path / "partial.pt", _partial_checkpoint(tiny_config, 99))
 
-    selected, resume_state = resolve_resume_checkpoint(
+    selected, resume_state = _resolve(
         tmp_path,
+        checkpoint_provenance=checkpoint_provenance,
         explicit_path=None,
         allow_inexact_resume=False,
     )
@@ -88,14 +112,20 @@ def test_auto_resume_selects_exact_checkpoint_over_higher_progress_partial(
     assert resume_state["version"] == RESUME_STATE_VERSION
 
 
-def test_invalid_exact_candidate_does_not_hide_valid_exact_candidate(tmp_path, tiny_config):
-    valid_path = _save(tmp_path / "valid.pt", _exact_checkpoint(tiny_config, 4))
-    invalid = _exact_checkpoint(tiny_config, 99)
+def test_invalid_exact_candidate_does_not_hide_valid_exact_candidate(
+    tmp_path, tiny_config, checkpoint_provenance
+):
+    valid_path = _save(
+        tmp_path / "valid.pt",
+        _exact_checkpoint(tiny_config, 4, checkpoint_provenance),
+    )
+    invalid = _exact_checkpoint(tiny_config, 99, checkpoint_provenance)
     invalid["resume_state"]["version"] = RESUME_STATE_VERSION + 1
     _save(tmp_path / "invalid.pt", invalid)
 
-    selected, resume_state = resolve_resume_checkpoint(
+    selected, resume_state = _resolve(
         tmp_path,
+        checkpoint_provenance=checkpoint_provenance,
         explicit_path=None,
         allow_inexact_resume=False,
     )
@@ -104,11 +134,17 @@ def test_invalid_exact_candidate_does_not_hide_valid_exact_candidate(tmp_path, t
     assert selected.path == valid_path
     assert resume_state is not None
 
-def test_explicit_exact_checkpoint_is_accepted(tmp_path, tiny_config):
-    exact_path = _save(tmp_path / "exact.pt", _exact_checkpoint(tiny_config, 4))
+def test_explicit_exact_checkpoint_is_accepted(
+    tmp_path, tiny_config, checkpoint_provenance
+):
+    exact_path = _save(
+        tmp_path / "exact.pt",
+        _exact_checkpoint(tiny_config, 4, checkpoint_provenance),
+    )
 
-    selected, resume_state = resolve_resume_checkpoint(
+    selected, resume_state = _resolve(
         tmp_path,
+        checkpoint_provenance=checkpoint_provenance,
         explicit_path=exact_path,
         allow_inexact_resume=False,
     )
@@ -118,22 +154,28 @@ def test_explicit_exact_checkpoint_is_accepted(tmp_path, tiny_config):
     assert resume_state is not None
 
 
-def test_partial_explicit_resume_without_opt_in_fails(tmp_path, tiny_config):
+def test_partial_explicit_resume_without_opt_in_fails(
+    tmp_path, tiny_config, checkpoint_provenance
+):
     partial_path = _save(tmp_path / "partial.pt", _partial_checkpoint(tiny_config, 4))
 
-    with pytest.raises(CheckpointCompatibilityError, match="only a partial.*allow-inexact"):
-        resolve_resume_checkpoint(
+    with pytest.raises(CheckpointCompatibilityError, match="only an inexact.*allow-inexact"):
+        _resolve(
             tmp_path,
+            checkpoint_provenance=checkpoint_provenance,
             explicit_path=partial_path,
             allow_inexact_resume=False,
         )
 
 
-def test_partial_explicit_resume_with_opt_in_warns(tmp_path, tiny_config, capsys):
+def test_partial_explicit_resume_with_opt_in_warns(
+    tmp_path, tiny_config, capsys, checkpoint_provenance
+):
     partial_path = _save(tmp_path / "partial.pt", _partial_checkpoint(tiny_config, 4))
 
-    selected, resume_state = resolve_resume_checkpoint(
+    selected, resume_state = _resolve(
         tmp_path,
+        checkpoint_provenance=checkpoint_provenance,
         explicit_path=partial_path,
         allow_inexact_resume=True,
     )
@@ -143,15 +185,18 @@ def test_partial_explicit_resume_with_opt_in_warns(tmp_path, tiny_config, capsys
     assert resume_state is None
     warning = capsys.readouterr().out
     assert "WARNING: inexact pretraining resume explicitly enabled" in warning
-    assert "RNG, AMP scaler, and early-stopping patience" in warning
+    assert "not exact because" in warning
 
 
-def test_auto_resume_does_not_silently_downgrade_to_partial(tmp_path, tiny_config):
+def test_auto_resume_does_not_silently_downgrade_to_partial(
+    tmp_path, tiny_config, checkpoint_provenance
+):
     partial_path = _save(tmp_path / "partial.pt", _partial_checkpoint(tiny_config, 4))
 
     with pytest.raises(CheckpointCompatibilityError, match="never downgrades") as exc_info:
-        resolve_resume_checkpoint(
+        _resolve(
             tmp_path,
+            checkpoint_provenance=checkpoint_provenance,
             explicit_path=None,
             allow_inexact_resume=False,
         )
@@ -159,31 +204,38 @@ def test_auto_resume_does_not_silently_downgrade_to_partial(tmp_path, tiny_confi
     assert str(partial_path) in str(exc_info.value)
 
 
-def test_inexact_opt_in_requires_explicit_path(tmp_path):
+def test_inexact_opt_in_requires_explicit_path(tmp_path, checkpoint_provenance):
     with pytest.raises(ValueError, match="requires --resume-checkpoint"):
-        resolve_resume_checkpoint(
+        _resolve(
             tmp_path,
+            checkpoint_provenance=checkpoint_provenance,
             explicit_path=None,
             allow_inexact_resume=True,
         )
 
 
-def test_malformed_claimed_exact_state_is_not_downgraded_by_opt_in(tmp_path, tiny_config):
-    checkpoint = _exact_checkpoint(tiny_config, 4)
+def test_malformed_claimed_exact_state_is_not_downgraded_by_opt_in(
+    tmp_path, tiny_config, checkpoint_provenance
+):
+    checkpoint = _exact_checkpoint(tiny_config, 4, checkpoint_provenance)
     checkpoint["resume_state"]["version"] = RESUME_STATE_VERSION + 1
     checkpoint_path = _save(tmp_path / "future-resume.pt", checkpoint)
 
     with pytest.raises(CheckpointValidationError, match="Unsupported resume-state version"):
-        resolve_resume_checkpoint(
+        _resolve(
             tmp_path,
+            checkpoint_provenance=checkpoint_provenance,
             explicit_path=checkpoint_path,
             allow_inexact_resume=True,
         )
 
 
-def test_empty_auto_resume_directory_returns_no_checkpoint(tmp_path):
-    selected, resume_state = resolve_resume_checkpoint(
+def test_empty_auto_resume_directory_returns_no_checkpoint(
+    tmp_path, checkpoint_provenance
+):
+    selected, resume_state = _resolve(
         tmp_path,
+        checkpoint_provenance=checkpoint_provenance,
         explicit_path=None,
         allow_inexact_resume=False,
     )
