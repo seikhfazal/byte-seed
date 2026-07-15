@@ -31,6 +31,8 @@ PR 2C fixed audit CD-08: batched generation now tracks stop-token completion ind
 
 PR 3 adds deterministic coverage for checkpoint schema metadata, kind-aware pretraining resume selection, explicit-path validation, corrupt-candidate handling, stable ordering, and legacy inference compatibility. SFT and model-only checkpoints cannot be selected for pretraining resume.
 
+PR 4 adds deterministic CPU coverage for exact pretraining continuation state. Tests capture and restore Python and PyTorch CPU RNG state, exercise optional all-device CUDA RNG handling with test doubles, round-trip enabled and disabled scaler state, preserve early-stopping patience, validate training-critical configuration, and migrate nested optimizer tensor state. A tiny dropout/AdamW test compares uninterrupted training with an interrupted, serialized, reconstructed, and resumed run; final parameters, optimizer state, progress, and subsequent random samples must match. Legacy Anchor-like inference fixtures remain covered, while partial legacy pretraining continuation requires explicit opt-in.
+
 The suite currently has no known strict expected failures.
 
 Later defect-fix PRs must remove the relevant `xfail` marker, retain the focused assertion, and add any boundary coverage needed for the corrected behavior. Do not silently turn a known defect into a passing compatibility expectation.

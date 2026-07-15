@@ -21,7 +21,7 @@ def _optimizer_state() -> dict[str, object]:
     return {"state": {}, "param_groups": []}
 
 
-def test_pretrain_checkpoint_metadata_contains_required_resume_state():
+def test_pretrain_checkpoint_metadata_contains_required_structural_state():
     checkpoint = build_checkpoint(
         CheckpointKind.PRETRAIN,
         model_state=_model_state(),

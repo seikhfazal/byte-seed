@@ -134,6 +134,20 @@ python scripts/benchmark_generation.py --dtype auto
 
 Training notes are documented in [docs/TRAINING_NOTES.md](docs/TRAINING_NOTES.md).
 
+Exact automatic pretraining resume uses only checkpoints with complete continuation state:
+
+```powershell
+python -m byteseed.pretrain --config configs/byteseed_12m.yaml --resume
+```
+
+Partial legacy continuation is intentionally explicit and inexact:
+
+```powershell
+python -m byteseed.pretrain --config configs/byteseed_12m.yaml --resume-checkpoint checkpoints\legacy_pretrain.pt --allow-inexact-resume
+```
+
+The inexact option cannot restore RNG, AMP scaler, or early-stopping patience state. See the training notes for the determinism boundary.
+
 ## Tests and CI
 
 Deterministic CPU-only unit tests protect current model and runtime invariants without requiring local checkpoints or tokenizer binaries:

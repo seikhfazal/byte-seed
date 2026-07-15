@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pickle
+import random
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
@@ -11,6 +12,38 @@ import torch
 
 
 CHECKPOINT_VERSION = 1
+RESUME_STATE_VERSION = 1
+
+TRAINING_CRITICAL_CONFIG_FIELDS = (
+    "vocab_size",
+    "block_size",
+    "n_layer",
+    "n_head",
+    "n_embd",
+    "dropout",
+    "batch_size",
+    "gradient_accumulation_steps",
+    "learning_rate",
+    "max_iters",
+    "eval_interval",
+    "eval_iters",
+    "weight_decay",
+    "warmup_iters",
+    "processed_data_dir",
+    "train_split",
+    "seed",
+    "early_stopping_patience",
+)
+
+_TRAINING_RUNTIME_DEFAULTS = {
+    "optimizer": "AdamW",
+    "optimizer_betas": (0.9, 0.999),
+    "optimizer_eps": 1e-8,
+    "learning_rate_schedule": "linear_warmup_then_constant",
+    "gradient_clip_norm": 1.0,
+    "batch_sampler": "global_torch_randint",
+    "autocast_dtype": "float16",
+}
 
 
 class CheckpointKind(str, Enum):
@@ -21,6 +54,7 @@ class CheckpointKind(str, Enum):
 
 class CheckpointOperation(str, Enum):
     PRETRAIN_RESUME = "pretraining resume"
+    PRETRAIN_EXACT_RESUME = "exact pretraining resume"
     MODEL_LOAD = "model loading"
 
 
@@ -70,6 +104,7 @@ def build_checkpoint(
     iteration: int | None = None,
     optimizer_state: Mapping[str, Any] | None = None,
     best_val: float | None = None,
+    resume_state: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a version-1 checkpoint while retaining ByteSeed's legacy payload keys."""
     checkpoint_kind = _coerce_kind(kind)
@@ -85,6 +120,10 @@ def build_checkpoint(
         data["optimizer"] = optimizer_state
     if best_val is not None:
         data["best_val"] = float(best_val)
+    if resume_state is not None:
+        if checkpoint_kind is not CheckpointKind.PRETRAIN:
+            raise ValueError("Only pretraining checkpoints may contain exact resume state.")
+        data["resume_state"] = dict(resume_state)
 
     required = {
         CheckpointKind.PRETRAIN: ("optimizer", "iter"),
@@ -97,7 +136,262 @@ def build_checkpoint(
             f"Cannot build {checkpoint_kind.value} checkpoint; missing required fields: "
             f"{', '.join(missing)}."
         )
+    if resume_state is not None:
+        validate_exact_resume_checkpoint(data)
     return data
+
+
+def capture_rng_state() -> dict[str, Any]:
+    """Capture only RNG sources used by pretraining without initializing CUDA."""
+    cuda_states = None
+    if torch.cuda.is_available() and torch.cuda.is_initialized():
+        cuda_states = [state.cpu().clone() for state in torch.cuda.get_rng_state_all()]
+    return {
+        "python": random.getstate(),
+        "torch_cpu": torch.get_rng_state().cpu().clone(),
+        "torch_cuda": cuda_states,
+    }
+
+
+def restore_rng_state(state: Mapping[str, Any]) -> None:
+    """Restore validated RNG state at the final point before stochastic work."""
+    python_state, cpu_state, cuda_states = _validated_rng_state(state)
+    if cuda_states is not None:
+        if not torch.cuda.is_available():
+            raise CheckpointCompatibilityError(
+                "Exact resume requires saved CUDA RNG states, but CUDA is unavailable."
+            )
+        device_count = torch.cuda.device_count()
+        if len(cuda_states) != device_count:
+            raise CheckpointCompatibilityError(
+                "Exact resume CUDA device-count mismatch: "
+                f"checkpoint={len(cuda_states)}, current={device_count}."
+            )
+
+    random.setstate(python_state)
+    torch.set_rng_state(cpu_state.cpu())
+    if cuda_states is not None:
+        torch.cuda.set_rng_state_all([value.cpu() for value in cuda_states])
+
+
+def capture_scaler_state(scaler: Any | None) -> dict[str, Any]:
+    """Represent both active CUDA scaling and disabled CPU/no-scaler operation."""
+    enabled = bool(scaler is not None and scaler.is_enabled())
+    return {
+        "enabled": enabled,
+        "state": scaler.state_dict() if enabled else {},
+    }
+
+
+def restore_scaler_state(scaler: Any | None, state: Mapping[str, Any]) -> None:
+    """Restore an active scaler, rejecting enabled/disabled configuration drift."""
+    expected_enabled, saved_state = _validated_scaler_state(state)
+    actual_enabled = bool(scaler is not None and scaler.is_enabled())
+    if actual_enabled != expected_enabled:
+        raise CheckpointCompatibilityError(
+            "Exact resume AMP configuration mismatch: "
+            f"checkpoint enabled={expected_enabled}, current enabled={actual_enabled}."
+        )
+    if expected_enabled:
+        scaler.load_state_dict(saved_state)
+
+
+def training_config_snapshot(
+    config: Mapping[str, Any],
+    *,
+    device_type: str,
+    amp_enabled: bool,
+) -> dict[str, Any]:
+    """Extract configuration that can change pretraining continuation."""
+    missing = [field for field in TRAINING_CRITICAL_CONFIG_FIELDS if field not in config]
+    if missing:
+        raise ValueError(
+            "Cannot capture exact-resume training configuration; missing fields: "
+            + ", ".join(missing)
+            + "."
+        )
+    snapshot = {field: config[field] for field in TRAINING_CRITICAL_CONFIG_FIELDS}
+    snapshot.update(_TRAINING_RUNTIME_DEFAULTS)
+    snapshot["device_type"] = str(device_type)
+    snapshot["amp_enabled"] = bool(amp_enabled)
+    return snapshot
+
+
+def validate_training_config(
+    saved: Mapping[str, Any],
+    current: Mapping[str, Any],
+) -> None:
+    """Reject exact resume when a training-critical value differs."""
+    if not isinstance(saved, Mapping):
+        raise CheckpointValidationError("resume_state.training_config must be a mapping.")
+    if not isinstance(current, Mapping):
+        raise TypeError("current training configuration must be a mapping.")
+
+    required = set(TRAINING_CRITICAL_CONFIG_FIELDS) | set(_TRAINING_RUNTIME_DEFAULTS) | {
+        "device_type",
+        "amp_enabled",
+    }
+    missing_saved = sorted(required - set(saved))
+    missing_current = sorted(required - set(current))
+    if missing_saved or missing_current:
+        details = []
+        if missing_saved:
+            details.append("checkpoint missing " + ", ".join(missing_saved))
+        if missing_current:
+            details.append("current run missing " + ", ".join(missing_current))
+        raise CheckpointCompatibilityError(
+            "Exact resume training configuration is incomplete: " + "; ".join(details) + "."
+        )
+
+    differences = [field for field in sorted(required) if saved[field] != current[field]]
+    if differences:
+        details = ", ".join(
+            f"{field} (checkpoint={_safe_value(saved[field])}, current={_safe_value(current[field])})"
+            for field in differences
+        )
+        raise CheckpointCompatibilityError(
+            "Exact resume training configuration mismatch: " + details + "."
+        )
+
+
+def build_resume_state(
+    *,
+    scaler: Any | None,
+    best_val: float,
+    patience_left: int,
+    training_config: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Capture a coherent version-1 exact pretraining continuation point."""
+    if isinstance(patience_left, bool) or not isinstance(patience_left, int) or patience_left < 0:
+        raise ValueError("patience_left must be a non-negative integer.")
+    return {
+        "version": RESUME_STATE_VERSION,
+        "rng_state": capture_rng_state(),
+        "amp_scaler": capture_scaler_state(scaler),
+        "early_stopping": {
+            "best_val": float(best_val),
+            "patience_left": patience_left,
+        },
+        "training_config": dict(training_config),
+    }
+
+
+def validate_exact_resume_checkpoint(data: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Validate and return the exact-resume block of a pretraining checkpoint."""
+    info = classify_checkpoint(data)
+    if info.kind is not CheckpointKind.PRETRAIN:
+        raise CheckpointCompatibilityError(
+            f"Exact pretraining resume requires kind 'pretrain'; detected {info.kind_label}."
+        )
+    structural_missing = [
+        field for field in ("model", "optimizer", "config", "iter") if field not in data
+    ]
+    structural_invalid = []
+    if "optimizer" in data and not isinstance(data["optimizer"], Mapping):
+        structural_invalid.append("optimizer must be a mapping")
+    if "iter" in data and not _is_valid_iteration(data["iter"]):
+        structural_invalid.append("iter must be a non-negative integer")
+    if structural_missing or structural_invalid:
+        details = []
+        if structural_missing:
+            details.append("missing " + ", ".join(structural_missing))
+        if structural_invalid:
+            details.extend(structural_invalid)
+        raise CheckpointCompatibilityError(
+            "Exact pretraining resume requires complete structural state: "
+            + "; ".join(details)
+            + "."
+        )
+    if "resume_state" not in data:
+        raise CheckpointCompatibilityError(
+            "Checkpoint is structurally pretraining-resumable but lacks exact resume_state."
+        )
+    resume_state = data["resume_state"]
+    if not isinstance(resume_state, Mapping):
+        raise CheckpointValidationError("resume_state must be a mapping.")
+
+    version = resume_state.get("version")
+    if isinstance(version, bool) or not isinstance(version, int):
+        raise CheckpointValidationError("resume_state.version must be an integer.")
+    if version != RESUME_STATE_VERSION:
+        raise CheckpointValidationError(
+            f"Unsupported resume-state version {version}; this ByteSeed build supports "
+            f"version {RESUME_STATE_VERSION}."
+        )
+
+    required = {"rng_state", "amp_scaler", "early_stopping", "training_config"}
+    missing = sorted(required - set(resume_state))
+    if missing:
+        raise CheckpointValidationError(
+            "resume_state is incomplete; missing required fields: " + ", ".join(missing) + "."
+        )
+    _validated_rng_state(resume_state["rng_state"])
+    _validated_scaler_state(resume_state["amp_scaler"])
+
+    early_stopping = resume_state["early_stopping"]
+    if not isinstance(early_stopping, Mapping):
+        raise CheckpointValidationError("resume_state.early_stopping must be a mapping.")
+    missing_early = sorted({"best_val", "patience_left"} - set(early_stopping))
+    if missing_early:
+        raise CheckpointValidationError(
+            "resume_state.early_stopping is incomplete; missing: "
+            + ", ".join(missing_early)
+            + "."
+        )
+    best_val = early_stopping["best_val"]
+    if isinstance(best_val, bool) or not isinstance(best_val, (int, float)):
+        raise CheckpointValidationError(
+            "resume_state.early_stopping.best_val must be numeric."
+        )
+    patience_left = early_stopping["patience_left"]
+    if isinstance(patience_left, bool) or not isinstance(patience_left, int) or patience_left < 0:
+        raise CheckpointValidationError(
+            "resume_state.early_stopping.patience_left must be a non-negative integer."
+        )
+    training_config = resume_state["training_config"]
+    if not isinstance(training_config, Mapping):
+        raise CheckpointValidationError("resume_state.training_config must be a mapping.")
+    required_training = (
+        set(TRAINING_CRITICAL_CONFIG_FIELDS)
+        | set(_TRAINING_RUNTIME_DEFAULTS)
+        | {"device_type", "amp_enabled"}
+    )
+    missing_training = sorted(required_training - set(training_config))
+    if missing_training:
+        raise CheckpointValidationError(
+            "resume_state.training_config is incomplete; missing: "
+            + ", ".join(missing_training)
+            + "."
+        )
+
+    top_level_best = data.get("best_val")
+    if top_level_best is not None:
+        if isinstance(top_level_best, bool) or not isinstance(top_level_best, (int, float)):
+            raise CheckpointValidationError("Checkpoint best_val must be numeric.")
+        if float(top_level_best) != float(best_val):
+            raise CheckpointValidationError(
+                "Checkpoint best_val disagrees with resume_state.early_stopping.best_val."
+            )
+    return resume_state
+
+
+def is_exact_resumable(data: Mapping[str, Any]) -> bool:
+    try:
+        validate_exact_resume_checkpoint(data)
+    except CheckpointError:
+        return False
+    return True
+
+
+def move_optimizer_state_to_device(
+    optimizer: torch.optim.Optimizer,
+    device: str | torch.device,
+) -> None:
+    """Move nested optimizer tensor state to the parameter device after CPU loading."""
+    target = torch.device(device)
+    for parameter_state in optimizer.state.values():
+        for key, value in list(parameter_state.items()):
+            parameter_state[key] = _move_value_to_device(value, target)
 
 
 def classify_checkpoint(data: Mapping[str, Any]) -> CheckpointInfo:
@@ -135,10 +429,10 @@ def classify_checkpoint(data: Mapping[str, Any]) -> CheckpointInfo:
     if _has_valid_pretrain_resume_fields(data):
         kind = CheckpointKind.PRETRAIN
     elif "optimizer" in data:
-        # An optimizer without all current resume fields is ambiguous and must fail closed for resume.
+        # An optimizer without all current resume fields is ambiguous and fails closed.
         kind = None
     else:
-        # Known Anchor/SFT and bare state-dict containers are model-bearing but not resumable.
+        # Anchor/SFT and bare state-dict containers remain inference-compatible.
         kind = CheckpointKind.MODEL_ONLY
     return CheckpointInfo(version=None, kind=kind, legacy=True, progress=_progress(data))
 
@@ -240,6 +534,9 @@ def _require_compatible(
             + "."
         )
 
+    if operation is CheckpointOperation.PRETRAIN_EXACT_RESUME:
+        validate_exact_resume_checkpoint(data)
+
 
 def _validate_model_state(data: Mapping[str, Any]) -> None:
     if "model" not in data:
@@ -284,6 +581,91 @@ def _coerce_kind(
         raise error_type(f"Unsupported checkpoint kind {value!r}; expected one of: {allowed}.") from exc
 
 
+def _validated_rng_state(
+    state: Mapping[str, Any],
+) -> tuple[tuple[Any, ...], torch.Tensor, list[torch.Tensor] | None]:
+    if not isinstance(state, Mapping):
+        raise CheckpointValidationError("resume_state.rng_state must be a mapping.")
+    missing = sorted({"python", "torch_cpu", "torch_cuda"} - set(state))
+    if missing:
+        raise CheckpointValidationError(
+            "resume_state.rng_state is incomplete; missing: " + ", ".join(missing) + "."
+        )
+    python_state = state["python"]
+    if not isinstance(python_state, tuple):
+        raise CheckpointValidationError(
+            "resume_state.rng_state.python must be a Python random-state tuple."
+        )
+    try:
+        random.Random().setstate(python_state)
+    except (TypeError, ValueError) as exc:
+        raise CheckpointValidationError(
+            "resume_state.rng_state.python is not a valid Python random state."
+        ) from exc
+    cpu_state = state["torch_cpu"]
+    if not isinstance(cpu_state, torch.Tensor) or cpu_state.dtype is not torch.uint8:
+        raise CheckpointValidationError(
+            "resume_state.rng_state.torch_cpu must be a uint8 tensor."
+        )
+    try:
+        torch.Generator(device="cpu").set_state(cpu_state.cpu())
+    except RuntimeError as exc:
+        raise CheckpointValidationError(
+            "resume_state.rng_state.torch_cpu is not a valid PyTorch CPU RNG state."
+        ) from exc
+    raw_cuda_states = state["torch_cuda"]
+    if raw_cuda_states is None:
+        cuda_states = None
+    elif isinstance(raw_cuda_states, (list, tuple)) and all(
+        isinstance(value, torch.Tensor) and value.dtype is torch.uint8
+        for value in raw_cuda_states
+    ):
+        cuda_states = list(raw_cuda_states)
+    else:
+        raise CheckpointValidationError(
+            "resume_state.rng_state.torch_cuda must be null or a sequence of uint8 tensors."
+        )
+    return python_state, cpu_state, cuda_states
+
+
+def _validated_scaler_state(state: Mapping[str, Any]) -> tuple[bool, Mapping[str, Any]]:
+    if not isinstance(state, Mapping):
+        raise CheckpointValidationError("resume_state.amp_scaler must be a mapping.")
+    missing = sorted({"enabled", "state"} - set(state))
+    if missing:
+        raise CheckpointValidationError(
+            "resume_state.amp_scaler is incomplete; missing: " + ", ".join(missing) + "."
+        )
+    enabled = state["enabled"]
+    saved_state = state["state"]
+    if not isinstance(enabled, bool):
+        raise CheckpointValidationError("resume_state.amp_scaler.enabled must be a boolean.")
+    if not isinstance(saved_state, Mapping):
+        raise CheckpointValidationError("resume_state.amp_scaler.state must be a mapping.")
+    if enabled and not saved_state:
+        raise CheckpointValidationError(
+            "An enabled AMP scaler requires a non-empty saved state."
+        )
+    return enabled, saved_state
+
+
+def _move_value_to_device(value: Any, device: torch.device) -> Any:
+    if isinstance(value, torch.Tensor):
+        return value.to(device)
+    if isinstance(value, dict):
+        return {key: _move_value_to_device(item, device) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_move_value_to_device(item, device) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_move_value_to_device(item, device) for item in value)
+    return value
+
+
+def _safe_value(value: Any) -> str:
+    text = repr(value)
+    return text if len(text) <= 80 else text[:77] + "..."
+
+
 def _normalized_path(path: Path) -> str:
     return path.as_posix().casefold()
 
@@ -293,8 +675,11 @@ def _selection_key(
     operation: CheckpointOperation,
 ) -> tuple[int, str]:
     normalized_path = _normalized_path(checkpoint.path)
-    if operation is CheckpointOperation.PRETRAIN_RESUME:
-        # Pretraining progress is comparable; path ordering is the stable equal-progress tie-breaker.
+    if operation in {
+        CheckpointOperation.PRETRAIN_RESUME,
+        CheckpointOperation.PRETRAIN_EXACT_RESUME,
+    }:
+        # Progress is comparable; normalized path is the equal-progress tie-breaker.
         return checkpoint.info.progress or 0, normalized_path
-    # Iteration counters are not comparable across pretraining and stage-local SFT.
+    # Iterations are not comparable across pretraining and stage-local SFT/model loading.
     return checkpoint.path.stat().st_mtime_ns, normalized_path

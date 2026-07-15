@@ -32,14 +32,35 @@ Useful anchor checkpoints produced during development:
 - `checkpoints/anchor_v2_2_finetuned.pt`
 - `checkpoints/anchor_v2_3_finetuned.pt`
 
-## Checkpoint Metadata And Selection
+## Checkpoint Metadata, Selection, And Exact Pretraining Resume
 
-- Newly saved checkpoints use checkpoint schema version `1` and explicitly identify their kind as `pretrain`, `sft`, or `model_only`.
-- Automatic pretraining resume accepts only structurally resumable pretraining checkpoints with model, optimizer, configuration, and iteration state. Newer SFT or model-only files cannot displace a compatible pretraining checkpoint.
-- `--resume-checkpoint` selects an explicit pretraining checkpoint; a missing, malformed, or incompatible path fails clearly and never falls back to another file.
-- Legacy checkpoints remain supported for inference when they contain model state. A legacy checkpoint is pretraining-resumable only when it also contains valid optimizer, configuration, and iteration state.
-- SFT currently initializes from compatible model weights; it does not implement automatic interrupted-SFT resume.
-- Exact resume equivalence is not yet guaranteed. RNG, AMP scaler, early-stopping patience, sampler, and related restoration remain separate PR 4 work.
+- Checkpoint container schema version `1` identifies each checkpoint as `pretrain`, `sft`, or `model_only`.
+- New production pretraining checkpoints contain a nested exact-resume block with resume-state version `1`. SFT and model-only checkpoints are not marked exact-pretraining-resumable.
+- Automatic pretraining resume selects only complete exact-resume checkpoints. A newer SFT, model-only, or partial legacy checkpoint cannot displace a compatible exact pretraining checkpoint, and automatic selection never silently downgrades to partial continuation.
+- The exact state contains Python RNG state, PyTorch CPU RNG state, all initialized CUDA-device RNG states when CUDA is active, AMP GradScaler enablement/state, best validation loss, remaining early-stopping patience, and a training-critical configuration snapshot.
+- Pretraining currently has no dedicated `torch.Generator`, and NumPy is used to load processed arrays rather than to make random training decisions, so no separate generator or NumPy RNG state is serialized.
+- `iter` means the last fully completed optimizer step, including any evaluation and early-stopping update associated with that step. Resume starts at `iter + 1`, preserving learning-rate, evaluation, and checkpoint cadence without repeating or skipping a step.
+- A checkpoint is captured after `optimizer.step()`, `GradScaler.update()`, evaluation, and early-stopping state updates. Its RNG state therefore describes the next operation after that coherent continuation point.
+- On exact resume, ByteSeed constructs the dataset, model, optimizer, and scaler; loads model/optimizer/scaler state; moves nested optimizer tensors to the parameter device; validates configuration; and restores RNG state last, immediately before the first resumed batch draw.
+- Exact resume validates architecture and training settings, including block/model dimensions, dropout, batch and accumulation sizes, AdamW settings, learning rate/schedule, weight decay, warm-up, evaluation cadence, maximum iterations, seed, data path, device type, AMP mode, and early-stopping patience. Differing fields fail clearly. The checkpoint's effective model vocabulary remains authoritative because tokenizer/corpus identity validation is deferred to PR 5.
+- `--resume-checkpoint` selects one explicit checkpoint and never falls back. A partial PR 3 or legacy pretraining checkpoint fails by default.
+- Partial continuation is available only with both an explicit path and `--allow-inexact-resume`; it prints a prominent warning because RNG, scaler, and patience state cannot be reconstructed. It is not described as exact resume.
+- Legacy Anchor-like checkpoints remain loadable for inference. Structurally complete legacy pretraining checkpoints remain recognizable for explicit inexact continuation.
+- SFT initializes from compatible model weights; interrupted-SFT exact resume is outside this pretraining-only change.
+
+Exact automatic resume:
+
+```powershell
+python -m byteseed.pretrain --config configs/byteseed_12m.yaml --resume
+```
+
+Explicit inexact continuation from a partial legacy checkpoint:
+
+```powershell
+python -m byteseed.pretrain --config configs/byteseed_12m.yaml --resume-checkpoint checkpoints\legacy_pretrain.pt --allow-inexact-resume
+```
+
+The exact-resume guarantee is intentionally bounded: with the same supported software/hardware conditions, deterministic operations, training-critical configuration, and unchanged data/tokenizer identity, continuation restores the same next stochastic and optimizer state. It does not promise bitwise identity across CPU and CUDA, different GPUs, different PyTorch/CUDA versions, nondeterministic kernels, or changed data/tokenizers. Stable tokenizer and corpus fingerprints are deferred to PR 5.
 
 ## Current Stable Checkpoint
 
