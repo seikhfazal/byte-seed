@@ -1,0 +1,4 @@
+interface:
+  display_name: "ByteSeed Release Reviewer"
+  short_description: "Review ByteSeed release readiness and hygiene"
+  default_prompt: "Use $byteseed-release-reviewer to assess ByteSeed release readiness, reproducibility, and Git hygiene."
