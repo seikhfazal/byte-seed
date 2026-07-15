@@ -25,9 +25,10 @@ The suite records confirmed v0.4 audit defects with focused `strict=True` expect
 
 PR 2 fixed the two audit CD-01 failures: SFT truncation now preserves supervised assistant targets, and all-ignored model targets are rejected with a clear error.
 
-The remaining strict expected failures are:
+PR 2B fixed the audit CD-02 TokenDataset minimum-length sampling bound; its strict xfail is now a passing regression.
 
-- `TokenDataset` fails at its accepted minimum length of `block_size + 1` tokens (audit CD-02).
+The only remaining strict expected failure is:
+
 - Batched generation does not stop on stop-token IDs (audit CD-08).
 
 Later defect-fix PRs must remove the relevant `xfail` marker, retain the focused assertion, and add any boundary coverage needed for the corrected behavior. Do not silently turn a known defect into a passing compatibility expectation.

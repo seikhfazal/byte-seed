@@ -26,7 +26,8 @@ class TokenDataset:
         self.device = device
 
     def get_batch(self, batch_size: int) -> tuple[torch.Tensor, torch.Tensor]:
-        ix = torch.randint(len(self.data) - self.block_size - 1, (batch_size,))
+        num_starts = len(self.data) - self.block_size
+        ix = torch.randint(num_starts, (batch_size,))
         x = torch.stack([self.data[i : i + self.block_size] for i in ix])
         y = torch.stack([self.data[i + 1 : i + self.block_size + 1] for i in ix])
         return x.to(self.device), y.to(self.device)
