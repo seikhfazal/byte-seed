@@ -27,9 +27,9 @@ PR 2 fixed the two audit CD-01 failures: SFT truncation now preserves supervised
 
 PR 2B fixed the audit CD-02 TokenDataset minimum-length sampling bound; its strict xfail is now a passing regression.
 
-The only remaining strict expected failure is:
+PR 2C fixed audit CD-08: batched generation now tracks stop-token completion independently for each row.
 
-- Batched generation does not stop on stop-token IDs (audit CD-08).
+The suite currently has no known strict expected failures.
 
 Later defect-fix PRs must remove the relevant `xfail` marker, retain the focused assertion, and add any boundary coverage needed for the corrected behavior. Do not silently turn a known defect into a passing compatibility expectation.
 

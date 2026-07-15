@@ -21,6 +21,7 @@ ByteSeed started from a tiny GPT-style decoder-only architecture implemented dir
 - Every accepted SFT example retains at least one supervised assistant target; batches with only ignored (`-100`) targets are rejected with a clear error.
 - Existing checkpoints remain compatible because this validation does not change model parameters, architecture, or state-dict structure.
 - TokenDataset now supports the minimum valid token count of `block_size + 1`; its sampling bound includes every valid start index while preserving the same shifted integer tensor semantics.
+- Inference now tracks completion independently for each batch row. Completed rows append their own stop token as inert filler while unfinished rows continue, without changing model architecture or checkpoint compatibility.
 - Anchor datasets worked better than broad curated SFT for the current model size.
 
 Useful anchor checkpoints produced during development:

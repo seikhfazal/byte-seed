@@ -116,7 +116,12 @@ class GPT(nn.Module):
         repetition_penalty: float = 1.0,
     ) -> torch.Tensor:
         self.eval()
-        stop_ids = {int(token_id) for token_id in stop_token_ids} if stop_token_ids is not None else None
+        stop_ids = {int(token_id) for token_id in stop_token_ids} if stop_token_ids else set()
+        stop_id_tensor = (
+            torch.tensor(sorted(stop_ids), dtype=idx.dtype, device=idx.device) if stop_ids else None
+        )
+        finished = torch.zeros(idx.size(0), dtype=torch.bool, device=idx.device)
+        filler_ids = torch.zeros(idx.size(0), dtype=idx.dtype, device=idx.device)
         for _ in range(max_new_tokens):
             idx_cond = idx[:, -self.config.block_size :]
             logits, _ = self(idx_cond)
@@ -137,8 +142,14 @@ class GPT(nn.Module):
                 logits[logits < values[:, [-1]]] = -float("inf")
             probs = F.softmax(logits, dim=-1)
             next_id = torch.multinomial(probs, num_samples=1)
+            if stop_id_tensor is not None:
+                # Keep the tensor rectangular: completed rows receive their own stop token as inert filler.
+                next_id = torch.where(finished.unsqueeze(1), filler_ids.unsqueeze(1), next_id)
+                newly_finished = (~finished) & torch.isin(next_id.squeeze(1), stop_id_tensor)
+                filler_ids = torch.where(newly_finished, next_id.squeeze(1), filler_ids)
+                finished = finished | newly_finished
             idx = torch.cat((idx, next_id), dim=1)
-            if stop_ids is not None and next_id.numel() == 1 and int(next_id.item()) in stop_ids:
+            if stop_id_tensor is not None and bool(torch.all(finished)):
                 break
         return idx
 
