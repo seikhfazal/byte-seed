@@ -6,6 +6,8 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from .checkpoint import CheckpointOperation, discover_checkpoint
+
 
 def set_seed(seed: int) -> None:
     random.seed(seed)
@@ -22,8 +24,9 @@ def ensure_dir(path: str | Path) -> Path:
 
 
 def latest_checkpoint(checkpoint_dir: str | Path) -> Path | None:
-    paths = sorted(Path(checkpoint_dir).glob("*.pt"), key=lambda p: p.stat().st_mtime)
-    return paths[-1] if paths else None
+    """Return the latest model-bearing checkpoint for legacy callers."""
+    checkpoint = discover_checkpoint(checkpoint_dir, CheckpointOperation.MODEL_LOAD)
+    return checkpoint.path if checkpoint is not None else None
 
 
 def warn_if_tiny_dataset(num_tokens: int, block_size: int) -> None:

@@ -8,6 +8,7 @@ import torch
 from torch.amp import GradScaler, autocast
 from tqdm import tqdm
 
+from .checkpoint import CheckpointKind, build_checkpoint
 from .config import align_config_to_tokenizer, load_config
 from .generate import load_model, marker_id, stop_token_ids
 from .tokenizer import ByteSeedTokenizer
@@ -156,7 +157,15 @@ def finetune(config_path: str, checkpoint: str | None, examples: str, iters: int
         scaler.update()
     out = Path(output) if output else ensure_dir(cfg.checkpoint_dir) / "chat_finetuned.pt"
     ensure_dir(out.parent)
-    torch.save({"model": model.state_dict(), "config": model.config.__dict__, "iter": iters}, out)
+    torch.save(
+        build_checkpoint(
+            CheckpointKind.SFT,
+            model_state=model.state_dict(),
+            config=model.config.__dict__,
+            iteration=iters,
+        ),
+        out,
+    )
     print(f"Saved chat fine-tuned checkpoint to {out}")
     return out
 

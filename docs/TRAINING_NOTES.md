@@ -32,6 +32,15 @@ Useful anchor checkpoints produced during development:
 - `checkpoints/anchor_v2_2_finetuned.pt`
 - `checkpoints/anchor_v2_3_finetuned.pt`
 
+## Checkpoint Metadata And Selection
+
+- Newly saved checkpoints use checkpoint schema version `1` and explicitly identify their kind as `pretrain`, `sft`, or `model_only`.
+- Automatic pretraining resume accepts only structurally resumable pretraining checkpoints with model, optimizer, configuration, and iteration state. Newer SFT or model-only files cannot displace a compatible pretraining checkpoint.
+- `--resume-checkpoint` selects an explicit pretraining checkpoint; a missing, malformed, or incompatible path fails clearly and never falls back to another file.
+- Legacy checkpoints remain supported for inference when they contain model state. A legacy checkpoint is pretraining-resumable only when it also contains valid optimizer, configuration, and iteration state.
+- SFT currently initializes from compatible model weights; it does not implement automatic interrupted-SFT resume.
+- Exact resume equivalence is not yet guaranteed. RNG, AMP scaler, early-stopping patience, sampler, and related restoration remain separate PR 4 work.
+
 ## Current Stable Checkpoint
 
 `checkpoints/anchor_v2_3_finetuned.pt` is the current stable checkpoint.

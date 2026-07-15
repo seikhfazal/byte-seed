@@ -7,11 +7,12 @@ import torch
 from torch.amp import GradScaler, autocast
 from tqdm import tqdm
 
+from .checkpoint import CheckpointKind, CheckpointOperation, build_checkpoint, select_checkpoint
 from .config import align_config_to_tokenizer, config_from_checkpoint, load_config
 from .dataset import load_processed
 from .model import GPT
 from .tokenizer import ByteSeedTokenizer
-from .utils import ensure_dir, latest_checkpoint, set_seed
+from .utils import ensure_dir, set_seed
 
 
 @torch.no_grad()
@@ -35,7 +36,12 @@ def learning_rate(step: int, cfg) -> float:
     return cfg.learning_rate
 
 
-def train(config_path: str, resume: bool = False, max_iters: int | None = None) -> Path:
+def train(
+    config_path: str,
+    resume: bool = False,
+    max_iters: int | None = None,
+    resume_checkpoint: str | None = None,
+) -> Path:
     cfg = load_config(config_path, {"max_iters": max_iters})
     set_seed(cfg.seed)
     checkpoint_dir = ensure_dir(cfg.checkpoint_dir)
@@ -43,10 +49,15 @@ def train(config_path: str, resume: bool = False, max_iters: int | None = None) 
     start_iter = 0
     best_val = float("inf")
 
-    if resume:
-        ckpt_path = latest_checkpoint(checkpoint_dir)
-        if ckpt_path:
-            ckpt = torch.load(ckpt_path, map_location=cfg.resolved_device)
+    if resume or resume_checkpoint is not None:
+        selected = select_checkpoint(
+            checkpoint_dir,
+            CheckpointOperation.PRETRAIN_RESUME,
+            explicit_path=resume_checkpoint,
+        )
+        if selected is not None:
+            ckpt_path = selected.path
+            ckpt = selected.data
             cfg = config_from_checkpoint(ckpt.get("config", cfg.__dict__), fallback_device=cfg.device)
             if max_iters is not None:
                 cfg.max_iters = int(max_iters)
@@ -90,11 +101,31 @@ def train(config_path: str, resume: bool = False, max_iters: int | None = None) 
             losses = estimate_loss(model, train_data, val_data, cfg)
             print(f"iter {step}: train {losses['train']:.4f}, val {losses['val']:.4f}")
             ckpt_path = checkpoint_dir / f"{cfg.model_name.lower()}_iter_{step}.pt"
-            torch.save({"model": model.state_dict(), "optimizer": optimizer.state_dict(), "config": cfg.__dict__, "iter": step, "best_val": best_val}, ckpt_path)
+            torch.save(
+                build_checkpoint(
+                    CheckpointKind.PRETRAIN,
+                    model_state=model.state_dict(),
+                    optimizer_state=optimizer.state_dict(),
+                    config=cfg.__dict__,
+                    iteration=step,
+                    best_val=best_val,
+                ),
+                ckpt_path,
+            )
             if losses["val"] < best_val:
                 best_val = losses["val"]
                 patience_left = cfg.early_stopping_patience
-                torch.save({"model": model.state_dict(), "optimizer": optimizer.state_dict(), "config": cfg.__dict__, "iter": step, "best_val": best_val}, checkpoint_dir / "best.pt")
+                torch.save(
+                    build_checkpoint(
+                        CheckpointKind.PRETRAIN,
+                        model_state=model.state_dict(),
+                        optimizer_state=optimizer.state_dict(),
+                        config=cfg.__dict__,
+                        iteration=step,
+                        best_val=best_val,
+                    ),
+                    checkpoint_dir / "best.pt",
+                )
             elif cfg.early_stopping_patience > 0:
                 patience_left -= 1
                 if patience_left <= 0:
@@ -107,9 +138,14 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/byteseed_12m.yaml")
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument(
+        "--resume-checkpoint",
+        default=None,
+        help="Explicit pretraining-resume checkpoint. Implies --resume and never falls back.",
+    )
     parser.add_argument("--max-iters", type=int, default=None)
     args = parser.parse_args()
-    train(args.config, args.resume, args.max_iters)
+    train(args.config, args.resume, args.max_iters, args.resume_checkpoint)
 
 
 if __name__ == "__main__":

@@ -3,15 +3,14 @@
 import argparse
 import json
 import sys
-from pathlib import Path
 from typing import Any
 
 import torch
 
+from .checkpoint import CheckpointOperation, select_checkpoint
 from .config import ByteSeedConfig, config_from_checkpoint, load_config
 from .model import GPT
 from .tokenizer import ByteSeedTokenizer
-from .utils import latest_checkpoint
 
 
 NO_CHECKPOINT_MESSAGE = """No checkpoint found. Train first or pass --checkpoint checkpoints/your_file.pt.
@@ -71,11 +70,15 @@ def _shape_mismatch_message(error: RuntimeError, model_cfg: ByteSeedConfig, ckpt
 
 
 def load_model(cfg: ByteSeedConfig, checkpoint: str | None) -> GPT:
-    ckpt_path = Path(checkpoint) if checkpoint else latest_checkpoint(cfg.checkpoint_dir)
-    if ckpt_path is None or not ckpt_path.exists():
+    selected = select_checkpoint(
+        cfg.checkpoint_dir,
+        CheckpointOperation.MODEL_LOAD,
+        explicit_path=checkpoint,
+    )
+    if selected is None:
         raise FileNotFoundError(NO_CHECKPOINT_MESSAGE)
 
-    ckpt = torch.load(ckpt_path, map_location=cfg.resolved_device)
+    ckpt = selected.data
     model_cfg = _model_cfg_from_checkpoint(cfg, ckpt)
     device = model_cfg.resolved_device
     model = GPT(model_cfg).to(device)
