@@ -134,6 +134,16 @@ python scripts/benchmark_generation.py --dtype auto
 
 Training notes are documented in [docs/TRAINING_NOTES.md](docs/TRAINING_NOTES.md).
 
+## Tests and CI
+
+Deterministic CPU-only unit tests protect current model and runtime invariants without requiring local checkpoints or tokenizer binaries:
+
+```powershell
+pytest -q
+```
+
+See [docs/TESTING.md](docs/TESTING.md) for local setup, CI scope, and the documented strict expected failures for current audit defects.
+
 ## Demo Transcript
 
 ```text
