@@ -91,6 +91,8 @@ class GPT(nn.Module):
         batch, time = idx.shape
         if time > self.config.block_size:
             raise ValueError(f"Sequence length {time} exceeds block_size {self.config.block_size}.")
+        if targets is not None and not torch.any(targets != -100):
+            raise ValueError("Targets contain no supervised target tokens; every target is -100.")
         pos = torch.arange(0, time, device=idx.device)
         x = self.token_embedding(idx) + self.position_embedding(pos)
         x = self.dropout(x)

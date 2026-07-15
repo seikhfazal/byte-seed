@@ -33,7 +33,13 @@ class ChatSFTDataset:
                 if not line:
                     continue
                 row = json.loads(line)
-                x, y = self._encode_example(tokenizer, str(row["user"]), str(row["assistant"]), mask_prompt)
+                x, y = self._encode_example(
+                    tokenizer,
+                    str(row["user"]),
+                    str(row["assistant"]),
+                    mask_prompt,
+                    example_index=line_number,
+                )
                 if not x:
                     raise ValueError(f"Example on line {line_number} produced no training tokens.")
                 self.examples.append((x, y))
@@ -41,19 +47,45 @@ class ChatSFTDataset:
         if not self.examples:
             raise ValueError(f"No SFT examples found in {path}.")
 
-    def _encode_example(self, tokenizer: ByteSeedTokenizer, user: str, assistant: str, mask_prompt: bool) -> tuple[list[int], list[int]]:
+    def _encode_example(
+        self,
+        tokenizer: ByteSeedTokenizer,
+        user: str,
+        assistant: str,
+        mask_prompt: bool,
+        example_index: int | None = None,
+    ) -> tuple[list[int], list[int]]:
         prompt_text = f"<|user|>\n{user}\n<|assistant|>\n"
         answer_text = f"{assistant}\n<|end|>"
         prompt_ids = tokenizer.encode(prompt_text, add_bos=True)
         answer_ids = tokenizer.encode(answer_text, add_bos=False)
-        tokens = prompt_ids + answer_ids
-
-        # Keep the beginning of the prompt and as much of the answer as fits. SFT examples are independent,
-        # so truncation never creates windows that begin inside another example.
         max_tokens = self.block_size + 1
-        if len(tokens) > max_tokens:
-            tokens = tokens[:max_tokens]
+        prompt_token_count = len(prompt_ids)
+        answer_token_count = len(answer_ids)
 
+        if max_tokens < 2 or prompt_token_count == 0 or answer_token_count == 0:
+            raise self._no_supervision_error(example_index, prompt_token_count, answer_token_count)
+
+        if prompt_token_count + answer_token_count > max_tokens:
+            if prompt_token_count < max_tokens:
+                prompt_budget = prompt_token_count
+                answer_budget = max_tokens - prompt_budget
+            else:
+                minimum_prompt_tokens = min(prompt_token_count, min(2, max_tokens - 1))
+                answer_budget = min(answer_token_count, max_tokens - minimum_prompt_tokens)
+                prompt_budget = min(prompt_token_count, max_tokens - answer_budget)
+
+            # Remove old prompt context first while keeping the prompt/assistant boundary suffix.
+            prompt_ids = prompt_ids[-prompt_budget:]
+            if answer_token_count > answer_budget:
+                # Preserve answer content and, when space permits, the final <|end|> token.
+                answer_ids = (
+                    answer_ids[:answer_budget]
+                    if answer_budget == 1
+                    else answer_ids[: answer_budget - 1] + answer_ids[-1:]
+                )
+
+        tokens = prompt_ids + answer_ids
         x = tokens[:-1]
         y = tokens[1:]
 
@@ -61,7 +93,23 @@ class ChatSFTDataset:
             prompt_label_count = max(0, min(len(prompt_ids) - 1, len(y)))
             y[:prompt_label_count] = [IGNORE_INDEX] * prompt_label_count
 
+        if not any(label != IGNORE_INDEX for label in y):
+            raise self._no_supervision_error(example_index, prompt_token_count, answer_token_count)
+
         return x, y
+
+    def _no_supervision_error(
+        self,
+        example_index: int | None,
+        prompt_token_count: int,
+        answer_token_count: int,
+    ) -> ValueError:
+        location = f"Example on line {example_index}" if example_index is not None else "SFT example"
+        return ValueError(
+            f"{location} contains no supervised assistant target tokens after truncation "
+            f"(block_size={self.block_size}, prompt_tokens={prompt_token_count}, "
+            f"answer_tokens={answer_token_count})."
+        )
 
     def get_batch(self, batch_size: int) -> tuple[torch.Tensor, torch.Tensor]:
         indices = torch.randint(len(self.examples), (batch_size,))

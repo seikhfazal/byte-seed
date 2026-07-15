@@ -23,8 +23,10 @@ Tests reset Python, NumPy, and Torch CPU RNG state before every test. CUDA RNG s
 
 The suite records confirmed v0.4 audit defects with focused `strict=True` expected failures. An unexpected pass is therefore a CI failure until the corresponding defect-fix PR changes the test into a normal passing regression test.
 
-- All-ignored SFT labels produce a non-finite cross-entropy loss (audit CD-01).
-- Right truncation of a long SFT prompt can remove every supervised assistant target (audit CD-01).
+PR 2 fixed the two audit CD-01 failures: SFT truncation now preserves supervised assistant targets, and all-ignored model targets are rejected with a clear error.
+
+The remaining strict expected failures are:
+
 - `TokenDataset` fails at its accepted minimum length of `block_size + 1` tokens (audit CD-02).
 - Batched generation does not stop on stop-token IDs (audit CD-08).
 

@@ -17,6 +17,9 @@ ByteSeed started from a tiny GPT-style decoder-only architecture implemented dir
 
 - Initial broad curated SFT degraded behavior on this tiny model.
 - Example-wise SFT fixed the old random chunk SFT problem where prompt/answer boundaries could be mixed across examples.
+- SFT truncation now removes overlong prompt context from the left before assistant supervision is discarded, and truncates overlong answers from the right while retaining supervised answer tokens.
+- Every accepted SFT example retains at least one supervised assistant target; batches with only ignored (`-100`) targets are rejected with a clear error.
+- Existing checkpoints remain compatible because this validation does not change model parameters, architecture, or state-dict structure.
 - Anchor datasets worked better than broad curated SFT for the current model size.
 
 Useful anchor checkpoints produced during development:
