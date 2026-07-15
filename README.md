@@ -139,7 +139,7 @@ Training notes are documented in [docs/TRAINING_NOTES.md](docs/TRAINING_NOTES.md
 Deterministic CPU-only unit tests protect current model and runtime invariants without requiring local checkpoints or tokenizer binaries:
 
 ```powershell
-pytest -q
+python -m pytest -q
 ```
 
 See [docs/TESTING.md](docs/TESTING.md) for local setup, CI scope, and the documented strict expected failures for current audit defects.

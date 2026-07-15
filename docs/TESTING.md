@@ -14,7 +14,7 @@ Run the complete suite:
 
 ```powershell
 python -m compileall -q src scripts chat.py tests
-pytest -q
+python -m pytest -q
 ```
 
 Tests reset Python, NumPy, and Torch CPU RNG state before every test. CUDA RNG state is also seeded when CUDA is available, but CI remains CPU-only. Tests must not depend on execution order or assert a sampled natural-language response.
@@ -36,7 +36,7 @@ GitHub Actions runs on `ubuntu-latest` with Python 3.11 and executes:
 
 ```text
 python -m compileall -q src scripts chat.py
-pytest -q
+python -m pytest -q
 ```
 
 CI deliberately does not train or pretrain; run SFT; build or import data; train a tokenizer; use CUDA; benchmark GPUs; create persistent checkpoints; load local repository checkpoints; or require ignored tokenizer binaries. Checkpoint round-trip tests use only temporary CPU fixtures. Those workflows need separate, explicitly authorized validation.

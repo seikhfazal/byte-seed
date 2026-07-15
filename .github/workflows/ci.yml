@@ -17,4 +17,4 @@ jobs:
       - name: Compile source
         run: python -m compileall -q src scripts chat.py
       - name: Run CPU tests
-        run: pytest -q
+        run: python -m pytest -q
