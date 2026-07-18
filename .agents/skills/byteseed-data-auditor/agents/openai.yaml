@@ -1,4 +1,0 @@
-interface:
-  display_name: "ByteSeed Data Auditor"
-  short_description: "Audit ByteSeed data quality and contamination"
-  default_prompt: "Use $byteseed-data-auditor to audit ByteSeed data provenance, quality, overlap, and contamination."

@@ -1,4 +1,0 @@
-interface:
-  display_name: "ByteSeed Model Auditor"
-  short_description: "Audit ByteSeed model and runtime correctness"
-  default_prompt: "Use $byteseed-model-auditor to perform an evidence-based audit of ByteSeed model and runtime correctness."

@@ -1,4 +1,0 @@
-interface:
-  display_name: "ByteSeed Guardian"
-  short_description: "Protect ByteSeed stability and repository safety"
-  default_prompt: "Use $byteseed-guardian to review a proposed ByteSeed change for safety, regressions, and repository hygiene."
