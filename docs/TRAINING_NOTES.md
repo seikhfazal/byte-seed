@@ -77,7 +77,7 @@ The exact-resume guarantee is intentionally bounded: with the same supported sof
 - Split-strategy version `1` hashes the duplicate-group fingerprint with the configured seed and validation ratio. Assignment is independent of input and filesystem order. Cross-split document-ID, raw-fingerprint, and canonical-fingerprint reuse is rejected.
 - Train and validation documents are tokenized independently with the existing BOS/EOS tokens, so one document cannot contribute tokens to both arrays.
 - Registered evaluation-prompt contamination is an error by default. `--allow-eval-contamination` exists only for explicit historical reproduction, emits a warning, and changes report/manifest identity. Known contaminated results are never marked held out.
-- `data_quality_report.json` version `1` records policy versions, duplicate and split counts, removed IDs/sources, contamination findings, leakage status, token counts, override status, and a canonical SHA-256 digest without document bodies, timestamps, or absolute paths.
+- `data_quality_report.json` version `1` records policy versions, duplicate and split counts, removed IDs/sources, contamination findings, exact registered suite/prompt audit coverage, leakage status, token counts, override status, and a canonical SHA-256 digest without document bodies, timestamps, or absolute paths. Older version-1 reports without the additive coverage field remain valid but cannot prove a candidate suite clean.
 - Existing SFT JSONL can be inspected with the non-writing `audit_sft_file` helper for malformed records, empty required fields, duplicate conversations, and registered-prompt overlap. SFT training objectives and PR 2 truncation behavior are unchanged.
 - Old contiguous arrays and version-1 manifests remain historical/legacy data. See [DATA_QUALITY.md](DATA_QUALITY.md) for the full contract.
 
@@ -87,6 +87,18 @@ Historical evaluation must be reported exactly as:
 - Held-out generalization: not yet measured.
 
 All nine stable prompts occur verbatim in Anchor v2.3 SFT material. PR 6 guards new preparation but does not rewrite or retroactively cleanse historical artifacts.
+
+## Evaluation Reports And Determinism
+
+Evaluation does not participate in training or exact-resume state. The shared evaluation runner loads an existing model, records all decoding settings, generates in stable suite order, restores the caller's Python and Torch RNG state in a finally-safe path, and optionally writes an evaluation report. It does not update weights, optimizers, schedulers, early-stopping state, checkpoints, tokenizer files, or datasets.
+
+The historical `anchor-retention-v0.2` suite remains retention-only and known contaminated. The `candidate-paraphrase-v1` suite is initially candidate/unverified. It may be described as held out only for a run whose valid quality report records the exact suite version and ordered prompt IDs, has no matching finding or contamination override, links through the exact document-aware manifest-v2 report digest, and matches the checkpoint's recorded data-manifest digest. A zero generic contamination count is insufficient.
+
+Evaluation reports record seed, temperature, `top_k`, maximum generated tokens, repetition penalty, stop-token policy, dtype, device, compile status, batch size, prompt-format version, and deterministic-algorithm status. They also include path-safe checkpoint metadata, verified tokenizer identity, data-manifest identity, contamination classification, ordered per-case outputs, transparent rubric results, aggregates, and a canonical SHA-256 digest when those identities are available.
+
+Fixed-seed stochastic output is reproducible only within the same supported software, hardware, device, dtype, and deterministic-kernel boundary. No bitwise guarantee is made across CPU/CUDA, GPU models, PyTorch/CUDA versions, or nondeterministic kernels. Generation benchmark reports record the same configuration boundary but contain environment-dependent timing measurements.
+
+Use `python scripts/eval_stable_v0_2.py --help` for evaluation/report options and `python scripts/benchmark_generation.py --help` for benchmark-report options. See [EVALUATION.md](EVALUATION.md) for suite semantics, contamination classifications, report schemas, and complete commands.
 
 ## Current Stable Checkpoint
 

@@ -45,7 +45,7 @@ Each split is then tokenized independently. Every document receives its own exis
 
 ## Evaluation-contamination policy
 
-The stable Anchor prompt registry is shared by the stable evaluation script, benchmark default, and contamination checker. Matching uses normalization version `1` and detects:
+The versioned evaluation registry is shared by the stable evaluation runner and contamination checker. It contains the unchanged historical Anchor retention suite and the candidate paraphrase suite; the generation benchmark continues to use an Anchor prompt as its default input. Matching uses normalization version `1` and detects:
 
 - canonical full-document equality;
 - exact structured-field equality;
@@ -77,10 +77,11 @@ All nine stable Anchor prompts occur verbatim in the tracked Anchor v2.3 SFT mat
 - input, unique, duplicate, removed, train, validation, token, and contamination counts;
 - removed duplicate IDs/sources;
 - contamination findings with prompt ID, suite, split, document ID, logical source, match type, and shortened fingerprint;
+- evaluation-registry version plus each audited suite version and exact ordered prompt IDs;
 - leakage-validation result and contamination override status;
 - a deterministic SHA-256 report digest.
 
-It omits timestamps, absolute paths, and document bodies. Equivalent inputs in different order produce the same digest.
+It omits timestamps, absolute paths, and document bodies. Equivalent inputs in different order produce the same digest. Earlier report-v1 files without the additive exact-coverage field remain valid, but they cannot verify that a zero finding count covers the candidate suite. See [EVALUATION.md](EVALUATION.md) for the full held-out classification rules.
 
 Document-aware builds use data-manifest version `2`. The manifest continues to fingerprint `train.npy`, `val.npy`, and tokenizer identity, and additionally includes the report digest plus document, normalization, deduplication, split, seed, ratio, and contamination policy. Changing any of those identity fields changes the manifest digest.
 

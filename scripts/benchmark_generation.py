@@ -2,7 +2,7 @@
 
 import argparse
 import sys
-import time
+from collections.abc import Mapping
 from pathlib import Path
 
 import torch
@@ -11,9 +11,19 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from src.byteseed.benchmarking import (
+    BenchmarkConfig,
+    build_benchmark_report,
+    measure_generation,
+    render_benchmark_report,
+    write_benchmark_report,
+)
+from src.byteseed.checkpoint import CheckpointOperation, load_checkpoint
 from src.byteseed.config import load_config
 from src.byteseed.eval_prompts import ANCHOR_RETENTION_PROMPTS
+from src.byteseed.evaluation import logical_checkpoint_identity
 from src.byteseed.generate import load_model, marker_id, stop_token_ids
+from src.byteseed.provenance import canonical_sha256, sha256_file
 from src.byteseed.tokenizer import ByteSeedTokenizer
 
 
@@ -63,6 +73,7 @@ def run_generation(
     max_new_tokens: int,
     temperature: float,
     top_k: int | None,
+    repetition_penalty: float = 1.0,
 ) -> torch.Tensor:
     with torch.inference_mode():
         return model.generate(
@@ -70,6 +81,7 @@ def run_generation(
             max_new_tokens=max_new_tokens,
             temperature=temperature,
             top_k=top_k,
+            repetition_penalty=repetition_penalty,
             vocab_limit=tokenizer.vocab_size,
             stop_token_ids=stops,
         )
@@ -82,17 +94,28 @@ def main() -> None:
     parser.add_argument("--config", default="configs/byteseed_12m.yaml")
     parser.add_argument("--checkpoint", default="checkpoints/anchor_v2_3_finetuned.pt")
     parser.add_argument("--prompt", default=ANCHOR_RETENTION_PROMPTS[1].text)
+    parser.add_argument("--seed", type=int, default=1337)
     parser.add_argument("--runs", type=int, default=10)
     parser.add_argument("--warmup-runs", type=int, default=2)
     parser.add_argument("--temperature", type=float, default=0.2)
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--max-new-tokens", type=int, default=80)
+    parser.add_argument("--repetition-penalty", type=float, default=1.0)
+    parser.add_argument("--device", choices=("cpu", "cuda"), default=None)
     parser.add_argument("--dtype", choices=("auto", "fp32", "fp16"), default="auto")
     parser.add_argument("--compile", action="store_true", help="Try torch.compile on the model forward pass. Experimental and off by default.")
+    parser.add_argument("--deterministic-algorithms", action="store_true")
+    parser.add_argument("--output-json", default=None)
+    parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
 
-    cfg = load_config(args.config)
+    cfg = load_config(args.config, overrides={"device": args.device})
     tokenizer = ByteSeedTokenizer(cfg.tokenizer_dir)
+    loaded = load_checkpoint(
+        args.checkpoint,
+        CheckpointOperation.MODEL_LOAD,
+        runtime_tokenizer_identity=tokenizer.identity,
+    )
     model = load_model(cfg, args.checkpoint, tokenizer=tokenizer)
     device = next(model.parameters()).device
     dtype_name = resolve_dtype(args.dtype, device)
@@ -101,52 +124,100 @@ def main() -> None:
     stops = stop_token_ids(tokenizer, marker_id(tokenizer, "<|end|>") is not None)
     prompt = build_prompt(args.prompt)
     ids = torch.tensor([tokenizer.encode(prompt, add_bos=True)], dtype=torch.long, device=device)
+    config = BenchmarkConfig(
+        seed=args.seed,
+        warmup_runs=args.warmup_runs,
+        measured_runs=args.runs,
+        temperature=args.temperature,
+        top_k=args.top_k,
+        max_new_tokens=args.max_new_tokens,
+        repetition_penalty=args.repetition_penalty,
+        stop_token_ids=tuple(sorted(stops)),
+        device=str(device),
+        dtype=dtype_name,
+        compile=compiled,
+        deterministic_algorithms=args.deterministic_algorithms,
+        prompt_format_version=1,
+        prompt_id="benchmark.user-prompt",
+        prompt_digest=canonical_sha256(
+            {"prompt_format_version": 1, "prompt": args.prompt}
+        ),
+        input_token_count=ids.shape[1],
+    )
 
-    for _ in range(max(0, args.warmup_runs)):
-        synchronize_if_cuda(device)
-        _ = run_generation(model, ids, tokenizer, stops, args.max_new_tokens, args.temperature, args.top_k)
-        synchronize_if_cuda(device)
+    def run_once() -> int:
+        output = run_generation(
+            model,
+            ids,
+            tokenizer,
+            stops,
+            args.max_new_tokens,
+            args.temperature,
+            args.top_k,
+            args.repetition_penalty,
+        )
+        return int(output.shape[1] - ids.shape[1])
 
-    if device.type == "cuda":
-        torch.cuda.reset_peak_memory_stats(device)
+    def reset_peak_memory() -> None:
+        if device.type == "cuda":
+            torch.cuda.reset_peak_memory_stats(device)
 
-    latencies: list[float] = []
-    generated_counts: list[int] = []
-    for _ in range(args.runs):
-        synchronize_if_cuda(device)
-        start = time.perf_counter()
-        out = run_generation(model, ids, tokenizer, stops, args.max_new_tokens, args.temperature, args.top_k)
-        synchronize_if_cuda(device)
-        elapsed = time.perf_counter() - start
-        generated = int(out.shape[1] - ids.shape[1])
-        latencies.append(elapsed)
-        generated_counts.append(generated)
-
-    total_time = sum(latencies)
-    total_tokens = sum(generated_counts)
-    avg_latency = total_time / max(1, len(latencies))
-    min_latency = min(latencies) if latencies else 0.0
-    max_latency = max(latencies) if latencies else 0.0
-    avg_tokens = total_tokens / max(1, len(generated_counts))
-    tokens_per_sec = total_tokens / total_time if total_time > 0 else 0.0
-    peak_memory = torch.cuda.max_memory_allocated(device) / (1024 * 1024) if device.type == "cuda" else 0.0
-
-    print(f"checkpoint: {args.checkpoint}")
-    print(f"device: {device.type}")
-    print(f"dtype used: {dtype_name}")
-    print(f"compile: {'on' if compiled else 'off'}")
-    print(f"prompt: {args.prompt}")
-    print(f"runs: {args.runs}")
-    print(f"warmup runs: {args.warmup_runs}")
-    print(f"average latency: {avg_latency:.4f} sec")
-    print(f"min latency: {min_latency:.4f} sec")
-    print(f"max latency: {max_latency:.4f} sec")
-    print(f"average generated tokens: {avg_tokens:.1f}")
-    print(f"tokens/sec: {tokens_per_sec:.2f}")
-    if device.type == "cuda":
-        print(f"peak CUDA memory: {peak_memory:.2f} MiB")
-    else:
-        print("peak CUDA memory: n/a")
+    runs = measure_generation(
+        run_once,
+        config,
+        synchronize=lambda: synchronize_if_cuda(device),
+        after_warmups=reset_peak_memory,
+    )
+    peak_memory = (
+        torch.cuda.max_memory_allocated(device) / (1024 * 1024)
+        if device.type == "cuda"
+        else None
+    )
+    provenance = loaded.data.get("provenance")
+    provenance = provenance if isinstance(provenance, Mapping) else {}
+    data_manifest_digest = provenance.get("data_manifest_digest")
+    data_manifest_digest = (
+        data_manifest_digest if isinstance(data_manifest_digest, str) else None
+    )
+    kind = loaded.info.kind.value if loaded.info.kind is not None else loaded.info.kind_label
+    checkpoint_identity = logical_checkpoint_identity(
+        args.checkpoint,
+        version=loaded.info.version,
+        kind=kind,
+        legacy=loaded.info.legacy,
+        progress=loaded.info.progress,
+        data_manifest_digest=data_manifest_digest,
+        artifact_sha256=sha256_file(args.checkpoint),
+    )
+    model_fields = (
+        "model_name", "vocab_size", "block_size", "n_layer", "n_head", "n_embd", "dropout"
+    )
+    warnings = [
+        "Timing measurements are environment-dependent and are not reproducible across unlike systems."
+    ]
+    if args.compile and not compiled:
+        warnings.append("torch.compile was requested but could not be enabled.")
+    report = build_benchmark_report(
+        config,
+        runs,
+        checkpoint_identity=checkpoint_identity,
+        model_configuration={
+            field: getattr(model.config, field) for field in model_fields
+        },
+        parameter_count=sum(parameter.numel() for parameter in model.parameters()),
+        tokenizer_identity=(tokenizer.identity if loaded.tokenizer_verified else None),
+        peak_cuda_memory_mib=peak_memory,
+        warnings=warnings,
+    )
+    print(f"checkpoint: {Path(args.checkpoint).name}")
+    print(render_benchmark_report(report))
+    if args.output_json:
+        write_benchmark_report(
+            args.output_json,
+            report,
+            overwrite=args.overwrite,
+        )
+        print(f"Benchmark report written: {Path(args.output_json).name}")
 
 
 if __name__ == "__main__":

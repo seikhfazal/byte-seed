@@ -1,7 +1,9 @@
 ﻿from __future__ import annotations
 
 import argparse
+import json
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 
 import torch
@@ -10,10 +12,25 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from src.byteseed.checkpoint import CheckpointOperation, load_checkpoint
 from src.byteseed.config import load_config
-from src.byteseed.eval_prompts import ANCHOR_RETENTION_PROMPTS
+from src.byteseed.eval_prompts import (
+    ANCHOR_RETENTION_PROMPTS,
+    ANCHOR_RETENTION_SUITE,
+    registered_evaluation_suites,
+    get_evaluation_suite,
+)
+from src.byteseed.evaluation import (
+    GenerationConfig,
+    logical_checkpoint_identity,
+    render_evaluation_report,
+    run_evaluation,
+    torch_batch_generator,
+    write_evaluation_report,
+)
 from src.byteseed.generate import load_model, marker_id, stop_token_ids
 from src.byteseed.tokenizer import ByteSeedTokenizer
+from src.byteseed.provenance import sha256_file
 
 PREFERRED_CHECKPOINTS = (
     "checkpoints/anchor_v2_3_finetuned.pt",
@@ -99,35 +116,142 @@ def check_answer(prompt: str, answer: str) -> tuple[bool, str]:
     return False, "no check defined"
 
 
+def _read_json(path: str | None) -> dict[str, object] | None:
+    if path is None:
+        return None
+    value = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise ValueError(f"Expected a JSON object in {Path(path).name}.")
+    return value
+
+
+def _model_configuration(model: torch.nn.Module) -> dict[str, object]:
+    config = model.config
+    fields = (
+        "model_name",
+        "vocab_size",
+        "block_size",
+        "n_layer",
+        "n_head",
+        "n_embd",
+        "dropout",
+    )
+    return {field: getattr(config, field) for field in fields}
+
+
 def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    parser = argparse.ArgumentParser(description="Anchor-retention regression for ByteSeed chat checkpoints.")
+    parser = argparse.ArgumentParser(
+        description="Deterministic ByteSeed retention and candidate-suite evaluation."
+    )
     parser.add_argument("--config", default="configs/byteseed_12m.yaml")
-    parser.add_argument("--checkpoint", default=None, help="Checkpoint path. Defaults to newest stable Anchor checkpoint found.")
+    parser.add_argument(
+        "--checkpoint",
+        default=None,
+        help="Checkpoint path. Defaults to the newest stable Anchor checkpoint found.",
+    )
+    parser.add_argument(
+        "--suite",
+        default=ANCHOR_RETENTION_SUITE,
+        choices=[suite.suite_id for suite in registered_evaluation_suites()],
+    )
+    parser.add_argument("--seed", type=int, default=1337)
     parser.add_argument("--temperature", type=float, default=0.2)
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--max-new-tokens", type=int, default=80)
+    parser.add_argument("--repetition-penalty", type=float, default=1.0)
+    parser.add_argument("--batch-size", type=int, default=1)
+    parser.add_argument("--device", choices=["cpu", "cuda"], default=None)
+    parser.add_argument(
+        "--sampling-mode",
+        choices=["stochastic", "greedy"],
+        default="stochastic",
+    )
+    parser.add_argument("--deterministic-algorithms", action="store_true")
+    parser.add_argument("--data-quality-report", default=None)
+    parser.add_argument("--data-manifest", default=None)
+    parser.add_argument("--output-json", default=None)
+    parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
 
-    cfg = load_config(args.config)
+    cfg = load_config(args.config, overrides={"device": args.device})
     tokenizer = ByteSeedTokenizer(cfg.tokenizer_dir)
     checkpoint = args.checkpoint or default_checkpoint()
+    loaded = load_checkpoint(
+        checkpoint,
+        CheckpointOperation.MODEL_LOAD,
+        runtime_tokenizer_identity=tokenizer.identity,
+    )
     model = load_model(cfg, checkpoint, tokenizer=tokenizer)
+    actual_device = str(next(model.parameters()).device)
+    actual_dtype = str(next(model.parameters()).dtype).removeprefix("torch.")
+    stops = tuple(
+        sorted(
+            stop_token_ids(
+                tokenizer,
+                marker_id(tokenizer, "<|end|>") is not None,
+            )
+        )
+    )
+    generation = GenerationConfig(
+        seed=args.seed,
+        temperature=args.temperature,
+        top_k=args.top_k,
+        max_new_tokens=args.max_new_tokens,
+        repetition_penalty=args.repetition_penalty,
+        stop_token_ids=stops,
+        stop_at_end=True,
+        dtype=actual_dtype,
+        device=actual_device,
+        compile=False,
+        batch_size=args.batch_size,
+        prompt_format_version=1,
+        deterministic_algorithms=args.deterministic_algorithms,
+        sampling_mode=args.sampling_mode,
+    )
 
-    passed = 0
-    print(f"checkpoint: {checkpoint}")
-    for prompt in PROMPTS:
-        answer = generate_answer(model, tokenizer, prompt, args.max_new_tokens, args.temperature, args.top_k)
-        ok, reason = check_answer(prompt, answer)
-        passed += int(ok)
-        print(f"PROMPT: {prompt}")
-        print(f"ANSWER: {answer if answer else '[empty]'}")
-        print(f"RESULT: {'PASS' if ok else 'FAIL'}")
-        print(f"REASON: {reason}")
-        print()
-    print(f"Anchor-retention regression: {passed}/{len(PROMPTS)}.")
-    print("Held-out generalization: not yet measured.")
+    provenance = loaded.data.get("provenance")
+    provenance = provenance if isinstance(provenance, Mapping) else {}
+    data_manifest_digest = provenance.get("data_manifest_digest")
+    data_manifest_digest = (
+        data_manifest_digest if isinstance(data_manifest_digest, str) else None
+    )
+    data_manifest = _read_json(args.data_manifest)
+    if data_manifest is None and isinstance(provenance.get("data_manifest"), Mapping):
+        data_manifest = dict(provenance["data_manifest"])
+    quality_report = _read_json(args.data_quality_report)
+    kind = loaded.info.kind.value if loaded.info.kind is not None else loaded.info.kind_label
+    checkpoint_identity = logical_checkpoint_identity(
+        checkpoint,
+        version=loaded.info.version,
+        kind=kind,
+        legacy=loaded.info.legacy,
+        progress=loaded.info.progress,
+        data_manifest_digest=data_manifest_digest,
+        artifact_sha256=sha256_file(checkpoint),
+    )
+    report = run_evaluation(
+        get_evaluation_suite(args.suite),
+        generation,
+        torch_batch_generator(model, tokenizer),
+        checkpoint_identity=checkpoint_identity,
+        model_configuration=_model_configuration(model),
+        parameter_count=sum(parameter.numel() for parameter in model.parameters()),
+        tokenizer_identity=(tokenizer.identity if loaded.tokenizer_verified else None),
+        data_manifest_digest=data_manifest_digest,
+        quality_report=quality_report,
+        data_manifest=data_manifest,
+    )
+    print(f"checkpoint: {Path(checkpoint).name}")
+    print(render_evaluation_report(report))
+    if args.output_json:
+        write_evaluation_report(
+            args.output_json,
+            report,
+            overwrite=args.overwrite,
+        )
+        print(f"Evaluation report written: {Path(args.output_json).name}")
 
 
 if __name__ == "__main__":

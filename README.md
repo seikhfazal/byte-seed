@@ -152,7 +152,7 @@ Evaluation and benchmark scripts require local model artifacts. The historical r
 python scripts/eval_stable_v0_2.py --checkpoint checkpoints\anchor_v2_3_finetuned.pt
 ```
 
-Detailed procedures and safety boundaries live in [Training Notes](docs/TRAINING_NOTES.md), [Dataset Guide](docs/DATASET_GUIDE.md), and [Data Quality](docs/DATA_QUALITY.md).
+Detailed procedures and safety boundaries live in [Evaluation](docs/EVALUATION.md), [Training Notes](docs/TRAINING_NOTES.md), [Dataset Guide](docs/DATASET_GUIDE.md), and [Data Quality](docs/DATA_QUALITY.md).
 
 ## Reproducibility and checkpoint safety
 
@@ -166,13 +166,13 @@ The exact-resume guarantee is intentionally bounded. With matching supported sof
 
 New pretraining-data builds preserve document boundaries before tokenization. Canonical duplicate groups are assigned as a unit, so duplicate content cannot cross the train/validation boundary. Splitting is deterministic from the duplicate-group fingerprint, configured seed, and validation ratio.
 
-The registered stable evaluation prompts are checked for exact normalized overlap in document text and structured fields. New contaminated builds fail by default; the historical override is explicit and recorded in the quality report and manifest identity.
+Both registered evaluation suites are checked for exact normalized overlap in document text and structured fields. New reports record the exact suite versions and ordered prompt IDs audited. Contaminated builds fail by default; the historical override is explicit and recorded in the quality report and manifest identity.
 
 **Anchor-retention regression: 9/9.**
 
 **Held-out generalization: not yet measured.**
 
-The nine Anchor prompts occur verbatim in historical Anchor v2.3 SFT material. The retention result is not a generalization, accuracy, or benchmark claim. See [Data Quality](docs/DATA_QUALITY.md) for the full policy.
+The nine Anchor prompts occur verbatim in historical Anchor v2.3 SFT material. The retention result is not a generalization, accuracy, or benchmark claim. The candidate paraphrase suite remains unverified until exact audit, manifest, and checkpoint identities prove it clean. See [Evaluation](docs/EVALUATION.md) and [Data Quality](docs/DATA_QUALITY.md) for the full policy.
 
 ## Testing
 
@@ -188,7 +188,7 @@ To mirror the source compilation check used by CI:
 python -m compileall -q src scripts chat.py tests
 ```
 
-GitHub Actions runs CPU-only tests on Ubuntu with Python 3.11. The suite uses small synthetic models and temporary artifacts; it covers causal attention, model shapes, generation, tokenizer handling, datasets and SFT masking, checkpoint schema and selection, exact resume, provenance, document splitting, and evaluation-contamination guards. It does not require local checkpoints, tokenizer binaries, CUDA, or network access. See [Testing](docs/TESTING.md).
+GitHub Actions runs CPU-only tests on Ubuntu with Python 3.11. The suite uses small synthetic models and temporary artifacts; it covers causal attention, model shapes, generation, tokenizer handling, datasets and SFT masking, checkpoint schema and selection, exact resume, provenance, document splitting, evaluation contamination, RNG isolation, and evaluation/benchmark report validation. It does not require local checkpoints, tokenizer binaries, CUDA, or network access. See [Testing](docs/TESTING.md).
 
 ## Repository structure
 
@@ -219,9 +219,9 @@ GitHub Actions runs CPU-only tests on Ubuntu with Python 3.11. The suite uses sm
 
 Repository audits identify the following next areas of work:
 
-- A versioned held-out/paraphrase evaluation suite and deterministic machine-readable evaluation reports.
+- A provenance-verified candidate paraphrase run and broader held-out evaluation coverage.
 - Expanded clean, reviewed training corpora and stronger SFT data quality checks.
-- Better reproducible benchmark reporting with explicit sampling and output metadata.
+- Broader environment-aware benchmark methodology without cross-system superiority claims.
 - Optional SDPA and KV-cache paths only with parity testing while retaining the manual implementation as the default.
 - Packaging and public-artifact polish, including a documented policy for checkpoint and tokenizer distribution.
 
@@ -232,6 +232,7 @@ Repository audits identify the following next areas of work:
 - [Training notes and resume contract](docs/TRAINING_NOTES.md)
 - [Dataset guide](docs/DATASET_GUIDE.md)
 - [Data-quality and provenance policy](docs/DATA_QUALITY.md)
+- [Evaluation suites and report schemas](docs/EVALUATION.md)
 - [Testing and CI](docs/TESTING.md)
 - [Known limitations](docs/LIMITATIONS.md)
 - [Data handling guidance](data/README_DATA.md)
