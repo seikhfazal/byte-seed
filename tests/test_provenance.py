@@ -8,6 +8,7 @@ import pytest
 
 from byteseed.provenance import (
     DATA_MANIFEST_VERSION,
+    LEGACY_DATA_MANIFEST_VERSION,
     REQUIRED_SPECIAL_TOKENS,
     ProvenanceMismatchError,
     ProvenanceValidationError,
@@ -179,7 +180,7 @@ def test_pretraining_manifest_describes_consumed_train_and_validation_arrays(
         train_split=0.75,
     )
 
-    assert manifest["version"] == DATA_MANIFEST_VERSION
+    assert manifest["version"] == LEGACY_DATA_MANIFEST_VERSION
     assert manifest["tokenizer"]["digest"] == tokenizer_identity["digest"]
     assert [item["role"] for item in manifest["artifacts"]] == [
         "training corpus",

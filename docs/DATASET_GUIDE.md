@@ -29,11 +29,16 @@ Random scraping can introduce copyrighted text, low-quality data, private inform
 
 ## Recommended ByteSeed Dataset Path
 
-1. Write personal Markdown notes.
+1. Write personal Markdown notes; each source file remains one document.
 2. Add assistant SFT examples.
 3. Optionally import a small public dataset subset.
 4. Run a short training test.
 5. Start full training only after validation.
+
+New data preparation assigns document and duplicate groups before tokenization,
+rejects registered evaluation-prompt contamination by default, and writes a
+deterministic quality report. The old combined corpus is retained only for
+historical workflows. See [DATA_QUALITY.md](DATA_QUALITY.md).
 
 ## Practical Workflow
 

@@ -42,7 +42,7 @@ Do not commit:
 2. Use headings and short examples.
 3. Remove personal details and secrets.
 4. Run dataset inspection.
-5. Build the combined dataset.
+5. Run document-aware data preparation.
 
 ## Inspect The Dataset
 
@@ -50,16 +50,22 @@ Do not commit:
 python scripts/inspect_dataset.py
 ```
 
-## Build The Combined Personal Assistant Dataset
+## Optional Historical Combined Dataset
 
 ```powershell
 python scripts/build_personal_dataset.py
 ```
 
-This creates:
+This historical builder creates:
 
 - `data/raw/byteseed_personal_assistant_corpus.md`
 - `examples/byteseed_personal_assistant_sft.jsonl`
+
+New pretraining preparation does not use the combined Markdown output. It reads
+the original Markdown files under `data/raw/`, `data/raw/personal_assistant/`,
+and `data/raw/generated/markdown/` as separate documents. Top-level JSONL
+document records may contain either `text` or non-empty `user` and `assistant`
+fields. Each record remains one document.
 
 ## Later Tokenizer And Training Data Steps
 
@@ -67,5 +73,14 @@ This creates:
 python -m src.byteseed.train_tokenizer --config configs/byteseed_12m.yaml
 python -m src.byteseed.prepare_data --config configs/byteseed_12m.yaml
 ```
+
+Preparation deduplicates canonical-equivalent documents, assigns duplicate
+groups deterministically before tokenization, checks train/validation leakage,
+and rejects registered evaluation-prompt overlap by default. Historical
+reproduction of known contaminated material requires the explicit
+`--allow-eval-contamination` flag and is recorded as such.
+
+See [docs/DATA_QUALITY.md](../docs/DATA_QUALITY.md) for the exact policy and
+manifest compatibility rules.
 
 Start with short training tests before long training.

@@ -11,6 +11,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.byteseed.config import load_config
+from src.byteseed.eval_prompts import ANCHOR_RETENTION_PROMPTS
 from src.byteseed.generate import load_model, marker_id, stop_token_ids
 from src.byteseed.tokenizer import ByteSeedTokenizer
 
@@ -19,17 +20,7 @@ PREFERRED_CHECKPOINTS = (
     "checkpoints/anchor_v2_2_finetuned.pt",
 )
 
-PROMPTS = [
-    "who are you?",
-    "what is a stack ?",
-    "What is a queue?",
-    "What is overfitting?",
-    "What is underfitting?",
-    "Help me plan a 1 hour DSA study session.",
-    "How do I run ByteSeed chat?",
-    "My PyTorch says CUDA is false. What should I check?",
-    "Should I upload checkpoints to GitHub?",
-]
+PROMPTS = [prompt.text for prompt in ANCHOR_RETENTION_PROMPTS]
 
 
 def default_checkpoint() -> str:
@@ -111,7 +102,7 @@ def check_answer(prompt: str, answer: str) -> tuple[bool, str]:
 def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    parser = argparse.ArgumentParser(description="Stable v0.2 regression evaluation for ByteSeed chat checkpoints.")
+    parser = argparse.ArgumentParser(description="Anchor-retention regression for ByteSeed chat checkpoints.")
     parser.add_argument("--config", default="configs/byteseed_12m.yaml")
     parser.add_argument("--checkpoint", default=None, help="Checkpoint path. Defaults to newest stable Anchor checkpoint found.")
     parser.add_argument("--temperature", type=float, default=0.2)
@@ -135,7 +126,8 @@ def main() -> None:
         print(f"RESULT: {'PASS' if ok else 'FAIL'}")
         print(f"REASON: {reason}")
         print()
-    print(f"summary: {passed}/{len(PROMPTS)} passed")
+    print(f"Anchor-retention regression: {passed}/{len(PROMPTS)}.")
+    print("Held-out generalization: not yet measured.")
 
 
 if __name__ == "__main__":

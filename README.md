@@ -122,6 +122,11 @@ Run the stable regression evaluation:
 .\.venv\Scripts\python.exe scripts\eval_stable_v0_2.py --checkpoint checkpoints\anchor_v2_3_finetuned.pt
 ```
 
+This is the **Anchor-retention regression: 9/9.** Its nine prompts occur
+verbatim in Anchor v2.3 SFT data. **Held-out generalization: not yet measured.**
+New data preparation detects this exact normalized overlap; see
+[docs/DATA_QUALITY.md](docs/DATA_QUALITY.md).
+
 Benchmark dtype examples:
 
 ```powershell

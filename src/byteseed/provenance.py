@@ -12,7 +12,12 @@ import numpy as np
 
 HASH_ALGORITHM = "sha256"
 TOKENIZER_IDENTITY_VERSION = 1
-DATA_MANIFEST_VERSION = 1
+LEGACY_DATA_MANIFEST_VERSION = 1
+DATA_MANIFEST_VERSION = 2
+SUPPORTED_DATA_MANIFEST_VERSIONS = (
+    LEGACY_DATA_MANIFEST_VERSION,
+    DATA_MANIFEST_VERSION,
+)
 CHECKPOINT_PROVENANCE_VERSION = 1
 DEFAULT_HASH_CHUNK_SIZE = 1024 * 1024
 
@@ -248,6 +253,7 @@ def create_data_manifest(
     artifacts: Iterable[Mapping[str, Any]],
     preprocessing: Mapping[str, Any],
     metadata: Mapping[str, Any] | None = None,
+    manifest_version: int | None = None,
 ) -> dict[str, Any]:
     validate_tokenizer_identity(tokenizer_identity)
     normalized_artifacts = sorted(
@@ -256,8 +262,14 @@ def create_data_manifest(
     )
     if not normalized_artifacts:
         raise ProvenanceValidationError("Data manifest must contain at least one artifact.")
+    if manifest_version is None:
+        manifest_version = (
+            LEGACY_DATA_MANIFEST_VERSION
+            if preprocessing.get("version") == 1
+            else DATA_MANIFEST_VERSION
+        )
     manifest: dict[str, Any] = {
-        "version": DATA_MANIFEST_VERSION,
+        "version": manifest_version,
         "algorithm": HASH_ALGORITHM,
         "tokenizer": dict(tokenizer_identity),
         "artifacts": normalized_artifacts,
@@ -275,6 +287,7 @@ def build_pretraining_data_manifest(
     *,
     tokenizer_identity: Mapping[str, Any],
     train_split: float,
+    preprocessing_identity: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     processed = Path(processed_data_dir)
     artifacts = [
@@ -289,26 +302,55 @@ def build_pretraining_data_manifest(
             logical_name="val.npy",
         ),
     ]
-    preprocessing = {
-        "version": 1,
-        "builder": "byteseed.prepare_data",
-        "tokenization": {"add_bos": True, "add_eos": True},
-        "split": {
-            "strategy": "contiguous-token-fraction",
-            "train_fraction": float(train_split),
-        },
-    }
+    if preprocessing_identity is None:
+        existing_path = processed / "data_manifest.json"
+        if existing_path.is_file():
+            existing = _read_data_manifest(existing_path)
+            rebuilt = create_data_manifest(
+                tokenizer_identity=tokenizer_identity,
+                artifacts=artifacts,
+                preprocessing=existing["preprocessing"],
+                manifest_version=existing["version"],
+            )
+            compare_data_manifests(existing, rebuilt)
+            if existing["version"] == DATA_MANIFEST_VERSION:
+                _validate_persisted_quality_report(processed, existing)
+            return dict(existing)
+        report_path = processed / "data_quality_report.json"
+        if report_path.is_file():
+            raise ProvenanceValidationError(
+                "Orphaned data-quality report found: the document-aware v2 manifest "
+                f"is missing ({existing_path}); report={report_path}."
+            )
+        preprocessing = {
+            "version": 1,
+            "builder": "byteseed.prepare_data",
+            "tokenization": {"add_bos": True, "add_eos": True},
+            "split": {
+                "strategy": "contiguous-token-fraction",
+                "train_fraction": float(train_split),
+            },
+        }
+        manifest_version = LEGACY_DATA_MANIFEST_VERSION
+    else:
+        preprocessing = dict(preprocessing_identity)
+        manifest_version = DATA_MANIFEST_VERSION
     return create_data_manifest(
         tokenizer_identity=tokenizer_identity,
         artifacts=artifacts,
         preprocessing=preprocessing,
+        manifest_version=manifest_version,
     )
 
 
 def validate_data_manifest(manifest: Mapping[str, Any]) -> None:
     if not isinstance(manifest, Mapping):
         raise ProvenanceValidationError("Data manifest must be a mapping.")
-    _validate_version(manifest, "data manifest", DATA_MANIFEST_VERSION)
+    _validate_supported_version(
+        manifest,
+        "data manifest",
+        SUPPORTED_DATA_MANIFEST_VERSIONS,
+    )
     _validate_algorithm(manifest, "data manifest")
     validate_tokenizer_identity(manifest.get("tokenizer"))
     artifacts = manifest.get("artifacts")
@@ -321,9 +363,10 @@ def validate_data_manifest(manifest: Mapping[str, Any]) -> None:
     preprocessing = manifest.get("preprocessing")
     if not isinstance(preprocessing, Mapping):
         raise ProvenanceValidationError("Data manifest preprocessing must be a mapping.")
-    if preprocessing.get("version") != 1:
+    manifest_version = manifest["version"]
+    if preprocessing.get("version") != manifest_version:
         raise ProvenanceValidationError(
-            f"Unsupported preprocessing identity version {preprocessing.get('version')!r}."
+            "Data manifest and preprocessing identity versions must match."
         )
     builder = preprocessing.get("builder")
     tokenization = preprocessing.get("tokenization")
@@ -338,21 +381,14 @@ def validate_data_manifest(manifest: Mapping[str, Any]) -> None:
         raise ProvenanceValidationError(
             "Data manifest tokenization must define boolean add_bos and add_eos values."
         )
-    if not isinstance(split, Mapping) or "strategy" not in split or "train_fraction" not in split:
-        raise ProvenanceValidationError(
-            "Data manifest preprocessing must include split strategy and train_fraction."
-        )
+    if not isinstance(split, Mapping) or "strategy" not in split:
+        raise ProvenanceValidationError("Data manifest preprocessing must include split strategy.")
     if not isinstance(split["strategy"], str) or not split["strategy"]:
         raise ProvenanceValidationError("Data manifest split strategy must be non-empty text.")
-    train_fraction = split["train_fraction"]
-    if (
-        isinstance(train_fraction, bool)
-        or not isinstance(train_fraction, (int, float))
-        or not 0 < float(train_fraction) < 1
-    ):
-        raise ProvenanceValidationError(
-            "Data manifest split train_fraction must be numeric and between 0 and 1."
-        )
+    if manifest_version == LEGACY_DATA_MANIFEST_VERSION:
+        _validate_legacy_preprocessing(preprocessing)
+    else:
+        _validate_document_aware_preprocessing(preprocessing)
     stored_digest = _validate_digest(manifest.get("digest"), "data manifest digest")
     expected_digest = canonical_sha256(_data_manifest_digest_payload(manifest))
     if stored_digest != expected_digest:
@@ -393,7 +429,7 @@ def compare_data_manifests(
     if checkpoint_manifest["preprocessing"] != runtime_manifest["preprocessing"]:
         raise ProvenanceMismatchError(
             "split configuration",
-            "Data fingerprint mismatch for split configuration: "
+            "Data fingerprint mismatch for split configuration and data-quality policy: "
             f"checkpoint={short_digest(checkpoint_manifest['digest'])}, "
             f"runtime={short_digest(runtime_manifest['digest'])}.",
         )
@@ -494,6 +530,134 @@ def _data_manifest_digest_payload(manifest: Mapping[str, Any]) -> dict[str, Any]
     }
 
 
+def _read_data_manifest(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ProvenanceValidationError(f"Could not read data manifest {path}: {exc}") from exc
+    validate_data_manifest(value)
+    return dict(value)
+
+
+def _validate_persisted_quality_report(
+    processed: Path, manifest: Mapping[str, Any]
+) -> None:
+    quality_identity = manifest["preprocessing"]["data_quality"]
+    report_path = processed / "data_quality_report.json"
+    if not report_path.is_file():
+        raise FileNotFoundError(
+            f"Document-aware data-quality report is missing: {report_path}"
+        )
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ProvenanceValidationError(
+            f"Could not read data-quality report {report_path}: {exc}"
+        ) from exc
+    if not isinstance(report, Mapping):
+        raise ProvenanceValidationError("Data-quality report must be a mapping.")
+    if report.get("version") != quality_identity["report_version"]:
+        raise ProvenanceValidationError(
+            "Data-quality report version does not match the data manifest."
+        )
+    report_policy = report.get("policy")
+    if (
+        not isinstance(report_policy, Mapping)
+        or report_policy.get("allow_eval_contamination")
+        != quality_identity["allow_eval_contamination"]
+    ):
+        raise ProvenanceValidationError(
+            "Data-quality contamination policy does not match the data manifest."
+        )
+    report_digest = report.get("digest")
+    if report_digest != quality_identity["report_digest"]:
+        raise ProvenanceValidationError(
+            "Data-quality report digest does not match the data manifest."
+        )
+    payload = {key: value for key, value in report.items() if key != "digest"}
+    if report_digest != canonical_sha256(payload):
+        raise ProvenanceValidationError(
+            "Data-quality report digest does not match its canonical fields."
+        )
+
+
+def _validate_legacy_preprocessing(preprocessing: Mapping[str, Any]) -> None:
+    split = preprocessing["split"]
+    if "train_fraction" not in split:
+        raise ProvenanceValidationError(
+            "Legacy preprocessing must include split train_fraction."
+        )
+    train_fraction = split["train_fraction"]
+    if (
+        isinstance(train_fraction, bool)
+        or not isinstance(train_fraction, (int, float))
+        or not 0 < float(train_fraction) < 1
+    ):
+        raise ProvenanceValidationError(
+            "Data manifest split train_fraction must be numeric and between 0 and 1."
+        )
+
+
+def _validate_document_aware_preprocessing(
+    preprocessing: Mapping[str, Any],
+) -> None:
+    tokenization = preprocessing["tokenization"]
+    if tokenization.get("per_document") is not True:
+        raise ProvenanceValidationError(
+            "Document-aware tokenization must set per_document to true."
+        )
+    document_format = preprocessing.get("document_format")
+    normalization = preprocessing.get("normalization")
+    deduplication = preprocessing.get("deduplication")
+    split = preprocessing["split"]
+    quality = preprocessing.get("data_quality")
+    versioned = (
+        ("document_format", document_format),
+        ("normalization", normalization),
+        ("deduplication", deduplication),
+        ("split", split),
+    )
+    for label, value in versioned:
+        if not isinstance(value, Mapping) or value.get("version") != 1:
+            raise ProvenanceValidationError(
+                f"Document-aware preprocessing {label} must use version 1."
+            )
+    if document_format.get("name") != "markdown-source-or-jsonl-record":
+        raise ProvenanceValidationError("Unsupported document-aware input format.")
+    if deduplication.get("strategy") != "canonical-sha256-representative":
+        raise ProvenanceValidationError("Unsupported document deduplication strategy.")
+    representative_order = deduplication.get("representative_order")
+    if not isinstance(representative_order, str) or not representative_order.strip():
+        raise ProvenanceValidationError(
+            "Document deduplication representative_order must be non-empty text."
+        )
+    if split.get("strategy") != "canonical-group-sha256":
+        raise ProvenanceValidationError("Unsupported document split strategy.")
+    seed = split.get("seed")
+    ratio = split.get("validation_ratio")
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise ProvenanceValidationError("Document split seed must be an integer.")
+    if (
+        isinstance(ratio, bool)
+        or not isinstance(ratio, (int, float))
+        or not 0 < float(ratio) < 1
+    ):
+        raise ProvenanceValidationError(
+            "Document split validation_ratio must be numeric and between 0 and 1."
+        )
+    if not isinstance(quality, Mapping):
+        raise ProvenanceValidationError(
+            "Document-aware preprocessing must include data_quality identity."
+        )
+    if quality.get("report_version") != 1:
+        raise ProvenanceValidationError("Unsupported data-quality report version.")
+    _validate_digest(quality.get("report_digest"), "data-quality report digest")
+    if not isinstance(quality.get("allow_eval_contamination"), bool):
+        raise ProvenanceValidationError(
+            "Data-quality contamination override must be boolean."
+        )
+
+
 def _normalized_artifact(artifact: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(artifact, Mapping):
         raise ProvenanceValidationError("Data manifest artifact must be a mapping.")
@@ -554,6 +718,23 @@ def _validate_version(
     if version != supported:
         raise ProvenanceValidationError(
             f"Unsupported {label} version {version}; this ByteSeed build supports version {supported}."
+        )
+
+
+def _validate_supported_version(
+    value: Mapping[str, Any],
+    label: str,
+    supported: Iterable[int],
+) -> None:
+    version = value.get("version")
+    versions = tuple(supported)
+    if isinstance(version, bool) or not isinstance(version, int):
+        raise ProvenanceValidationError(f"{label} version must be an integer.")
+    if version not in versions:
+        supported_text = ", ".join(str(item) for item in versions)
+        raise ProvenanceValidationError(
+            f"Unsupported {label} version {version}; this ByteSeed build supports "
+            f"versions {supported_text}."
         )
 
 

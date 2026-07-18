@@ -12,6 +12,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.byteseed.config import load_config
+from src.byteseed.eval_prompts import ANCHOR_RETENTION_PROMPTS
 from src.byteseed.generate import load_model, marker_id, stop_token_ids
 from src.byteseed.tokenizer import ByteSeedTokenizer
 
@@ -80,7 +81,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Benchmark ByteSeed generation latency and throughput.")
     parser.add_argument("--config", default="configs/byteseed_12m.yaml")
     parser.add_argument("--checkpoint", default="checkpoints/anchor_v2_3_finetuned.pt")
-    parser.add_argument("--prompt", default="what is a stack ?")
+    parser.add_argument("--prompt", default=ANCHOR_RETENTION_PROMPTS[1].text)
     parser.add_argument("--runs", type=int, default=10)
     parser.add_argument("--warmup-runs", type=int, default=2)
     parser.add_argument("--temperature", type=float, default=0.2)

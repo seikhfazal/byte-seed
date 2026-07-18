@@ -5,16 +5,31 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from .data_quality import read_pretraining_documents
+
 
 def read_markdown_corpus(raw_data_dir: str | Path) -> str:
+    """Join source documents for tokenizer training without losing prep boundaries."""
+
+    return "\n\n".join(
+        document.text.strip() for document in read_pretraining_documents(raw_data_dir)
+    )
+
+
+def read_legacy_markdown_corpus(raw_data_dir: str | Path) -> str:
+    """Reproduce the historical top-level Markdown concatenation explicitly."""
+
     raw_path = Path(raw_data_dir)
     files = sorted(raw_path.glob("*.md"))
     if not files:
-        raise FileNotFoundError(f"No .md files found in {raw_path}. Add Markdown notes to data/raw/.")
-    chunks = []
-    for path in files:
-        chunks.append(path.read_text(encoding="utf-8").strip())
-    return "\n\n".join(chunk for chunk in chunks if chunk)
+        raise FileNotFoundError(f"No .md files found in {raw_path}.")
+    return "\n\n".join(
+        text
+        for text in (
+            path.read_text(encoding="utf-8-sig").strip() for path in files
+        )
+        if text
+    )
 
 
 class TokenDataset:

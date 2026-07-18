@@ -37,7 +37,7 @@ Useful anchor checkpoints produced during development:
 - Checkpoint container schema version `1` identifies each checkpoint as `pretrain`, `sft`, or `model_only`.
 - Checkpoint provenance version `1` uses SHA-256 identities. The checkpoint container remains schema version `1`; model state-dict keys and architecture are unchanged.
 - `tokenizer/byteseed.model` is authoritative because its bytes define the SentencePiece token-to-ID mapping. Tokenizer identity version `1` records its byte size and SHA-256, the effective vocabulary size, all required special-token IDs, and a canonical digest. The optional `.vocab` text file is not required for inference compatibility.
-- Data-manifest version `1` fingerprints the artifacts pretraining actually consumes: `train.npy` and `val.npy`. Each record contains a logical role/name, byte size, SHA-256, token count, NumPy dtype, and format. The manifest also contains tokenizer identity plus preprocessing identity for BOS/EOS handling and the contiguous token-fraction split. Data preparation writes `data_manifest.json` beside those arrays, while pretraining recomputes the current in-memory contract once from the consumed bytes before checkpoint selection.
+- Historical data-manifest version `1` fingerprints `train.npy`, `val.npy`, tokenizer identity, BOS/EOS handling, and the original contiguous token-fraction split. Document-aware builds use manifest version `2`, which preserves those artifact fingerprints and additionally identifies document format, normalization, deduplication, hash-based split seed/ratio, contamination policy, and the deterministic quality-report digest. Version `1` remains valid only under its original semantics and is never reinterpreted as document-aware.
 - The combined manifest digest is SHA-256 over compact UTF-8 JSON with sorted keys, deterministic artifact ordering, normalized forward-slash logical names, and `NaN` disabled. Absolute paths, filesystem timestamps, and informational metadata do not participate in identity.
 - New production pretraining checkpoints contain a nested exact-resume block with resume-state version `1`. SFT and model-only checkpoints are not marked exact-pretraining-resumable.
 - Automatic pretraining resume selects only checkpoints with complete execution state and matching tokenizer/data provenance. A newer SFT, model-only, partial legacy, tokenizer-mismatched, or corpus-mismatched checkpoint cannot displace a compatible exact pretraining checkpoint, and automatic selection never silently downgrades to inexact continuation.
@@ -67,6 +67,26 @@ python -m byteseed.pretrain --config configs/byteseed_12m.yaml --resume-checkpoi
 ```
 
 The exact-resume guarantee is intentionally bounded: with the same supported software/hardware conditions, deterministic operations, matching training-critical configuration, and matching tokenizer/data manifests, continuation restores the same next stochastic and optimizer state. It does not promise bitwise identity across CPU and CUDA, different GPUs, different PyTorch/CUDA versions, nondeterministic kernels, or changed data/tokenizers.
+
+## Document-Aware Data Preparation
+
+- New preparation reads real Markdown-file and JSONL-record boundaries before tokenization. It uses top-level Markdown, `personal_assistant/*.md`, and locally present `generated/markdown/*.md` sources while excluding the historical combined corpus.
+- Explicit document IDs are preserved. Otherwise IDs are derived deterministically from logical source plus canonical content; absolute paths and input positions are excluded.
+- Normalization version `1` applies Unicode NFC, newline normalization, outer-space removal, and conservative prose-whitespace collapse while preserving indented and fenced code.
+- Raw duplicates and additional canonical whitespace/Unicode-equivalent duplicates are reported separately. One representative is selected deterministically, and every duplicate group receives one split assignment.
+- Split-strategy version `1` hashes the duplicate-group fingerprint with the configured seed and validation ratio. Assignment is independent of input and filesystem order. Cross-split document-ID, raw-fingerprint, and canonical-fingerprint reuse is rejected.
+- Train and validation documents are tokenized independently with the existing BOS/EOS tokens, so one document cannot contribute tokens to both arrays.
+- Registered evaluation-prompt contamination is an error by default. `--allow-eval-contamination` exists only for explicit historical reproduction, emits a warning, and changes report/manifest identity. Known contaminated results are never marked held out.
+- `data_quality_report.json` version `1` records policy versions, duplicate and split counts, removed IDs/sources, contamination findings, leakage status, token counts, override status, and a canonical SHA-256 digest without document bodies, timestamps, or absolute paths.
+- Existing SFT JSONL can be inspected with the non-writing `audit_sft_file` helper for malformed records, empty required fields, duplicate conversations, and registered-prompt overlap. SFT training objectives and PR 2 truncation behavior are unchanged.
+- Old contiguous arrays and version-1 manifests remain historical/legacy data. See [DATA_QUALITY.md](DATA_QUALITY.md) for the full contract.
+
+Historical evaluation must be reported exactly as:
+
+- Anchor-retention regression: 9/9.
+- Held-out generalization: not yet measured.
+
+All nine stable prompts occur verbatim in Anchor v2.3 SFT material. PR 6 guards new preparation but does not rewrite or retroactively cleanse historical artifacts.
 
 ## Current Stable Checkpoint
 
