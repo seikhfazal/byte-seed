@@ -1,210 +1,253 @@
-﻿# ByteSeed
+<div align="center">
 
-ByteSeed is a tiny GPT-style decoder-only Transformer built from scratch in PyTorch for learning how LLMs work.
+# ByteSeed
 
-## Status
+**A small decoder-only Transformer implemented directly in PyTorch for learning, experimentation, and local language-model development.**
 
-Current stable baby assistant checkpoint: `anchor_v2_3`.
+[![CPU CI](https://github.com/seikhfazal/byte-seed/actions/workflows/ci.yml/badge.svg)](https://github.com/seikhfazal/byte-seed/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/Python-%3E%3D3.11-3776AB?logo=python&logoColor=white)](pyproject.toml)
+[![PyTorch](https://img.shields.io/badge/PyTorch-dependency-EE4C2C?logo=pytorch&logoColor=white)](pyproject.toml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Anchor v2.3 is a tiny targeted patch for underfitting wording and CUDA false troubleshooting confusion. It is not a broad model upgrade.
+[Overview](#overview) · [Install](#installation) · [Quick start](#quick-start) · [Training workflow](#training-workflow) · [Documentation](#documentation)
 
-v0.3-speed adds inference dtype options and better benchmarking. It does not change training or model architecture.
+</div>
 
-The current stable local checkpoint is:
+## Overview
 
-```text
-checkpoints/anchor_v2_3_finetuned.pt
+ByteSeed is a compact GPT-style language-model project built from first principles with PyTorch. It is intended to make the essential pieces of a decoder-only Transformer approachable: tokenization, causal attention, training, supervised fine-tuning, checkpoint handling, provenance validation, and local interactive generation.
+
+The project supports local CPU and CUDA execution, pretraining, supervised fine-tuning (SFT), evaluation scripts, and a terminal chat interface. It is deliberately small and experimental: it is a learning and local-development project, not a production language-model service.
+
+## Highlights
+
+- Decoder-only causal Transformer with manually implemented multi-head causal self-attention.
+- Learned token and position embeddings, pre-norm residual blocks, LayerNorm, GELU MLPs, dropout, and tied input/output embeddings.
+- SentencePiece BPE tokenization with required chat control tokens.
+- Local pretraining, example-wise SFT, evaluation, generation benchmarking, and terminal chat.
+- CPU and CUDA inference; automatic dtype selection uses fp16 on CUDA and fp32 on CPU.
+- Versioned checkpoint kinds and deterministic, type-aware checkpoint selection.
+- Exact pretraining resume for state-complete checkpoints with matching configuration and provenance.
+- SHA-256 tokenizer and data-manifest identities for compatibility validation.
+- Document-aware deterministic splitting, duplicate-group isolation, and exact evaluation-contamination guards for new data builds.
+- Deterministic CPU-only tests and GitHub Actions CI.
+
+## Model snapshot
+
+### Architecture facts
+
+| Property | Value |
+| --- | --- |
+| Default reference configuration | `ByteSeed-12M` (`configs/byteseed_12m.yaml`) |
+| Architecture | Decoder-only, GPT-style Transformer |
+| Context length | 256 tokens |
+| Transformer blocks | 8 |
+| Attention heads | 8 (40 dimensions per head) |
+| Embedding width | 320 |
+| MLP expansion | 4× embedding width with GELU |
+| Dropout | 0.1 |
+| Configured vocabulary capacity | 8,000 tokens |
+| Framework | PyTorch |
+
+The model ties the final language-model head to the token embedding table. The checked parameter-count utility reports **11,129,920 total/trainable parameters** for the current local `ByteSeed-12M` tokenizer snapshot, whose effective SentencePiece vocabulary is 3,699 tokens. The effective vocabulary—and therefore the exact parameter count—depends on the tokenizer artifact used at runtime; model configuration is aligned to that tokenizer when loaded.
+
+### Checkpoint-specific facts
+
+The current stable local checkpoint named by the repository is `checkpoints/anchor_v2_3_finetuned.pt`. Checkpoints and tokenizer binaries are intentionally ignored by Git, so a fresh clone does not include a runnable model artifact. See [Training Notes](docs/TRAINING_NOTES.md) and [Repository Hygiene](docs/REPO_HYGIENE.md) for the artifact policy.
+
+### Configurable values
+
+The repository also includes `ByteSeed-5M` and `ByteSeed-20M` YAML configurations. Architecture, training, and path settings are defined in `configs/`; the active tokenizer determines the effective vocabulary size.
+
+## Architecture
+
+ByteSeed predicts the next token at every position. Token IDs are embedded, combined with learned positional embeddings, passed through repeated pre-norm Transformer blocks, normalized once more, and projected through the tied language-model head.
+
+```mermaid
+flowchart LR
+    A[Source documents] --> B[Data-quality audit]
+    B --> C[Deterministic document split]
+    C --> D[SentencePiece tokenization]
+    D --> E[train.npy and val.npy]
+    E --> F[Decoder-only Transformer]
+    F --> G[Pretraining]
+    G --> H[Optional supervised fine-tuning]
+    H --> I[Local chat]
 ```
 
-`python chat.py` auto-selects this checkpoint when it exists.
+Each Transformer block applies LayerNorm, causal self-attention, a residual connection, LayerNorm, a GELU MLP, and a second residual connection. The lower-triangular attention mask prevents a token from attending to future positions. See [Architecture](docs/ARCHITECTURE.md) for the concise implementation overview.
 
-Suggested GitHub topics: pytorch, transformer, gpt, llm, language-model, from-scratch, machine-learning, deep-learning, cuda, sentencepiece
+## Installation
 
-## Features
+ByteSeed requires Python 3.11 or later. The project is developed with Windows PowerShell commands, and the package/development installation used by CI is portable.
 
-- Manually implemented GPT-style model
-- Tokenizer pipeline with SentencePiece
-- Local training loop and inference/generation
-- CUDA support
-- Chat CLI with `python chat.py`
-- Stateless single-turn mode by default
-- Checkpoint saving, loading, and auto-selection
-- Supervised fine-tuning workflow
-- Dataset preparation and cleaning scripts
-- Evaluation scripts
-- Generation benchmark script
-
-## What ByteSeed Is Not
-
-- Not a ChatGPT replacement
-- Not trained on internet-scale data
-- Not a general-purpose assistant yet
-- Not based on Hugging Face Transformers
-
-## Hardware Used
-
-This project has been developed and tested on:
-
-- Windows 11
-- Python 3.11
-- NVIDIA RTX 4050 Laptop GPU with 6GB VRAM
-- 16GB RAM
-
-CPU execution is useful for smoke tests, but training is expected to be slow without CUDA.
-
-## Model Size
-
-Current default model:
-
-- `ByteSeed-12M`
-- Around 11.1M parameters
-
-The local parameter count observed during development was about `11,129,920`.
-
-## How To Run
-
-From Windows PowerShell:
+### Windows PowerShell
 
 ```powershell
-cd D:\ByteSeed
-.\.venv\Scripts\activate
+git clone https://github.com/seikhfazal/byte-seed.git
+cd byte-seed
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e . -r requirements-dev.txt
+```
+
+### POSIX shells
+
+```bash
+git clone https://github.com/seikhfazal/byte-seed.git
+cd byte-seed
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e . -r requirements-dev.txt
+```
+
+The base runtime dependencies are declared in [pyproject.toml](pyproject.toml); `requirements-dev.txt` adds the test dependency.
+
+## Quick start
+
+`chat.py` starts the local terminal interface with the `ByteSeed-12M` configuration and the `precise` preset. It selects the first available preferred local checkpoint, with `anchor_v2_3_finetuned.pt` first in that order.
+
+```powershell
 python chat.py
 ```
 
-To explicitly select the stable checkpoint:
+To choose the stable local checkpoint explicitly:
 
 ```powershell
 python chat.py --checkpoint checkpoints\anchor_v2_3_finetuned.pt
 ```
 
-Useful launch examples:
+Useful verified options include `--preset balanced`, `--dtype fp32`, and `--dtype auto`. Chat starts stateless by default; use `/help` to view commands, including `/reset`, `/history on`, `/history off`, `/temp`, `/topk`, `/max`, `/raw`, and `/exit`.
+
+Chat requires a local SentencePiece model and a compatible checkpoint. Neither is distributed through the Git repository by default.
+
+## Training workflow
+
+Training and data commands create ignored local artifacts. Review the linked guides and use a small, reviewed corpus before launching longer runs.
 
 ```powershell
-python chat.py
-python chat.py --dtype fp32
-python chat.py --preset balanced
+# Inspect local data, then train the tokenizer.
+python scripts/inspect_dataset.py
+python -m src.byteseed.train_tokenizer --config configs/byteseed_12m.yaml
+
+# Build document-aware train/validation arrays and provenance records.
+python -m src.byteseed.prepare_data --config configs/byteseed_12m.yaml
+
+# Pretrain using the configured schedule.
+python -m src.byteseed.pretrain --config configs/byteseed_12m.yaml
+
+# Run the targeted Anchor v2.3 SFT wrapper.
+python scripts/run_anchor_v2_3_sft.py --config configs/byteseed_12m.yaml
 ```
 
-Useful chat commands:
-
-- `/reset`
-- `/history`
-- `/history on`
-- `/history off`
-- `/temp <value>`
-- `/topk <value>`
-- `/max <value>`
-- `/raw`
-- `/help`
-- `/exit`
-
-Default history mode is off because the current assistant works best as a single-turn model.
-
-See [docs/HOW_TO_RUN.md](docs/HOW_TO_RUN.md) for more details.
-
-## How To Evaluate And Benchmark
-
-Count parameters:
-
-```powershell
-python scripts/count_params.py --config configs/byteseed_12m.yaml
-```
-
-Compile-check source files:
-
-```powershell
-python -m compileall src scripts chat.py
-```
-
-Run the stable regression evaluation:
-
-```powershell
-.\.venv\Scripts\python.exe scripts\eval_stable_v0_2.py --checkpoint checkpoints\anchor_v2_3_finetuned.pt
-```
-
-This is the **Anchor-retention regression: 9/9.** Its nine prompts occur
-verbatim in Anchor v2.3 SFT data. **Held-out generalization: not yet measured.**
-New data preparation detects this exact normalized overlap; see
-[docs/DATA_QUALITY.md](docs/DATA_QUALITY.md).
-
-Benchmark dtype examples:
-
-```powershell
-python scripts/benchmark_generation.py --dtype fp32
-python scripts/benchmark_generation.py --dtype fp16
-python scripts/benchmark_generation.py --dtype auto
-```
-
-`torch.compile` is optional and experimental. Use `--compile` only when you want to test startup overhead and local compatibility.
-
-Training notes are documented in [docs/TRAINING_NOTES.md](docs/TRAINING_NOTES.md).
-
-Exact automatic pretraining resume uses only checkpoints with complete continuation state and matching tokenizer/data fingerprints:
+For an exact automatic pretraining resume, use a state-complete checkpoint with matching tokenizer and data identities:
 
 ```powershell
 python -m byteseed.pretrain --config configs/byteseed_12m.yaml --resume
 ```
 
-Partial legacy continuation is intentionally explicit and inexact:
+Evaluation and benchmark scripts require local model artifacts. The historical retention check is:
 
 ```powershell
-python -m byteseed.pretrain --config configs/byteseed_12m.yaml --resume-checkpoint checkpoints\legacy_pretrain.pt --allow-inexact-resume
+python scripts/eval_stable_v0_2.py --checkpoint checkpoints\anchor_v2_3_finetuned.pt
 ```
 
-The inexact option also covers provenance-unverified legacy checkpoints or an explicitly accepted data-manifest change. It never bypasses a known tokenizer mismatch. See the training notes for the fingerprint contract and determinism boundary.
+Detailed procedures and safety boundaries live in [Training Notes](docs/TRAINING_NOTES.md), [Dataset Guide](docs/DATASET_GUIDE.md), and [Data Quality](docs/DATA_QUALITY.md).
 
-## Tests and CI
+## Reproducibility and checkpoint safety
 
-Deterministic CPU-only unit tests protect current model and runtime invariants without requiring local checkpoints or tokenizer binaries:
+Checkpoint schema version 1 distinguishes `pretrain`, `sft`, and `model_only` checkpoints. Selection is deterministic and type-aware: automatic exact pretraining resume accepts only compatible, state-complete pretraining checkpoints and does not silently downgrade to an inexact continuation.
+
+New pretraining checkpoints record tokenizer identity, data-manifest identity, a complete optimizer continuation state, Python and PyTorch CPU RNG state, initialized CUDA RNG state when CUDA is active, AMP GradScaler state, early-stopping state, and a training-critical configuration snapshot. Tokenizer identity fingerprints model bytes, vocabulary size, and special-token IDs; data manifests fingerprint the token arrays and preprocessing identity.
+
+The exact-resume guarantee is intentionally bounded. With matching supported software and hardware conditions, deterministic operations, matching training-critical configuration, and matching tokenizer/data manifests, resume restores the next stochastic and optimizer state. It does not promise bitwise-identical results across different hardware, PyTorch/CUDA versions, or nondeterministic kernels. Legacy and explicitly inexact continuations remain opt-in and are documented in [Training Notes](docs/TRAINING_NOTES.md).
+
+## Data-quality policy
+
+New pretraining-data builds preserve document boundaries before tokenization. Canonical duplicate groups are assigned as a unit, so duplicate content cannot cross the train/validation boundary. Splitting is deterministic from the duplicate-group fingerprint, configured seed, and validation ratio.
+
+The registered stable evaluation prompts are checked for exact normalized overlap in document text and structured fields. New contaminated builds fail by default; the historical override is explicit and recorded in the quality report and manifest identity.
+
+**Anchor-retention regression: 9/9.**
+
+**Held-out generalization: not yet measured.**
+
+The nine Anchor prompts occur verbatim in historical Anchor v2.3 SFT material. The retention result is not a generalization, accuracy, or benchmark claim. See [Data Quality](docs/DATA_QUALITY.md) for the full policy.
+
+## Testing
+
+Run the complete deterministic suite from the repository root:
 
 ```powershell
 python -m pytest -q
 ```
 
-See [docs/TESTING.md](docs/TESTING.md) for local setup, CI scope, and the documented strict expected failures for current audit defects.
-
-## Demo Transcript
-
-```text
-python chat.py
-
-User: who are you?
-ByteSeed: I am ByteSeed, a small local assistant for DSA study and ByteSeed workflow. I keep answers short.
-
-User: what is a stack ?
-ByteSeed: A stack is LIFO: last in, first out. Push and pop removes the top.
-
-User: What is overfitting?
-ByteSeed: Overfitting means a model memorizes training data and performs worse on validation or new unseen data.
-
-User: How do I run ByteSeed chat?
-ByteSeed: cd D:/ByteSeed, then run python chat.py.
-
-User: Should I upload checkpoints to GitHub?
-ByteSeed: Do not commit checkpoints by default. Keep them in checkpoints/ locally or use external storage.
-```
-
-These are early local outputs from a tiny model and may vary depending on sampling settings.
-
-See [docs/DEMO_TRANSCRIPT.md](docs/DEMO_TRANSCRIPT.md).
-
-## Limitations
-
-ByteSeed is a small educational model. It can still hallucinate, confuse concepts outside its anchor training data, and produce unreliable answers. It is not safe for factual, medical, legal, financial, or security-critical use.
-
-See [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
-
-## Repo Hygiene And Checkpoints
-
-Do not commit checkpoints by default. Keep generated checkpoint files in `checkpoints/` locally or move them to external storage later if needed.
-
-Before making the repository public, run:
+To mirror the source compilation check used by CI:
 
 ```powershell
-git status
-git status --ignored
+python -m compileall -q src scripts chat.py tests
 ```
 
-Confirm that `.venv/`, `checkpoints/`, tokenizer binary files, processed data, runs, logs, and secrets are not staged.
+GitHub Actions runs CPU-only tests on Ubuntu with Python 3.11. The suite uses small synthetic models and temporary artifacts; it covers causal attention, model shapes, generation, tokenizer handling, datasets and SFT masking, checkpoint schema and selection, exact resume, provenance, document splitting, and evaluation-contamination guards. It does not require local checkpoints, tokenizer binaries, CUDA, or network access. See [Testing](docs/TESTING.md).
 
-See [docs/REPO_HYGIENE.md](docs/REPO_HYGIENE.md) and [docs/PUBLIC_RELEASE_CHECKLIST.md](docs/PUBLIC_RELEASE_CHECKLIST.md).
+## Repository structure
+
+```text
+.
+├── src/byteseed/       # Model, tokenizer, data, training, chat, checkpoint, and provenance code
+├── configs/            # 5M, 12M, and 20M YAML configurations
+├── scripts/            # Inspection, evaluation, benchmark, SFT, and utility entry points
+├── tests/              # Deterministic CPU test suite
+├── docs/               # Architecture, training, data-quality, testing, and safety notes
+├── data/               # Small tracked examples and data guidance; generated/imported data is ignored
+├── tokenizer/          # Local SentencePiece artifacts; binary model/vocabulary files are ignored
+├── checkpoints/        # Local model checkpoints; ignored by Git
+├── chat.py             # Root terminal-chat launcher
+└── pyproject.toml      # Package metadata and runtime dependencies
+```
+
+## Current limitations
+
+- ByteSeed is a small model trained on small local, synthetic, and curated datasets; it is not comparable to modern large-scale language models.
+- The current checkpoint is best treated as a local, single-turn assistant experiment. Multi-turn history is off by default because the training examples are mostly single-turn.
+- Outputs can hallucinate, repeat, or confuse concepts outside the Anchor training material. Do not use them for factual, medical, legal, financial, security-critical, or other high-stakes decisions.
+- The historical Anchor score is a retention regression with known training overlap; held-out generalization has not been measured.
+- Generation recomputes attention over the active context at each token. There is no KV cache or SDPA execution path; the manual attention implementation remains the educational reference.
+- There is no distributed-training workflow or broad benchmark suite.
+
+## Roadmap
+
+Repository audits identify the following next areas of work:
+
+- A versioned held-out/paraphrase evaluation suite and deterministic machine-readable evaluation reports.
+- Expanded clean, reviewed training corpora and stronger SFT data quality checks.
+- Better reproducible benchmark reporting with explicit sampling and output metadata.
+- Optional SDPA and KV-cache paths only with parity testing while retaining the manual implementation as the default.
+- Packaging and public-artifact polish, including a documented policy for checkpoint and tokenizer distribution.
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [How to run chat](docs/HOW_TO_RUN.md)
+- [Training notes and resume contract](docs/TRAINING_NOTES.md)
+- [Dataset guide](docs/DATASET_GUIDE.md)
+- [Data-quality and provenance policy](docs/DATA_QUALITY.md)
+- [Testing and CI](docs/TESTING.md)
+- [Known limitations](docs/LIMITATIONS.md)
+- [Data handling guidance](data/README_DATA.md)
+- [Repository hygiene](docs/REPO_HYGIENE.md)
+
+## Contributing
+
+Contributions are most useful when they are focused and verifiable:
+
+1. Create a focused branch and keep the change scoped.
+2. Update or add deterministic tests for behavioral changes.
+3. Run `python -m pytest -q` before proposing the change.
+4. Do not commit private data, checkpoints, tokenizer binaries, processed datasets, generated outputs, or secrets.
+
+The repository’s data and artifact rules are documented in [Repository Hygiene](docs/REPO_HYGIENE.md) and [Data README](data/README_DATA.md).
+
+## License
+
+ByteSeed is released under the [MIT License](LICENSE).
