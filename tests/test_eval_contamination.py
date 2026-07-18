@@ -16,6 +16,7 @@ from byteseed.data_quality import (
 )
 from byteseed.eval_prompts import (
     ANCHOR_RETENTION_PROMPTS,
+    CANDIDATE_PARAPHRASE_PROMPTS,
     EvaluationPrompt,
     registered_evaluation_prompts,
 )
@@ -162,17 +163,24 @@ def test_anchor_prompt_registry_is_unique_deterministic_and_text_stable():
 
     registry = registered_evaluation_prompts()
 
-    assert registry == ANCHOR_RETENTION_PROMPTS
-    assert [prompt.text for prompt in registry] == expected
+    assert registry == ANCHOR_RETENTION_PROMPTS + CANDIDATE_PARAPHRASE_PROMPTS
+    assert [prompt.text for prompt in ANCHOR_RETENTION_PROMPTS] == expected
     assert len({prompt.prompt_id for prompt in registry}) == len(registry)
-    assert all(prompt.historical_status == "known-training-overlap" for prompt in registry)
+    assert all(
+        prompt.historical_status == "known-training-overlap"
+        for prompt in ANCHOR_RETENTION_PROMPTS
+    )
 
 
 def test_stable_evaluation_reports_retention_separately_from_generalization():
-    source = (ROOT / "scripts" / "eval_stable_v0_2.py").read_text(encoding="utf-8")
+    wrapper = (ROOT / "scripts" / "eval_stable_v0_2.py").read_text(encoding="utf-8")
+    renderer = (ROOT / "src" / "byteseed" / "evaluation.py").read_text(
+        encoding="utf-8"
+    )
 
-    assert "Anchor-retention regression:" in source
-    assert "Held-out generalization: not yet measured." in source
+    assert "render_evaluation_report" in wrapper
+    assert "Anchor-retention regression" in renderer
+    assert "Held-out generalization: not yet measured." in renderer
 
 
 def test_historical_anchor_v2_3_sft_contains_all_retention_prompts():

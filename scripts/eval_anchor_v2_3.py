@@ -11,6 +11,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.byteseed.config import load_config
+from src.byteseed.evaluation import isolated_rng
 from src.byteseed.generate import load_model, marker_id, stop_token_ids
 from src.byteseed.tokenizer import ByteSeedTokenizer
 
@@ -99,6 +100,7 @@ def main() -> None:
     parser.add_argument("--temperature", type=float, default=0.2)
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--max-new-tokens", type=int, default=80)
+    parser.add_argument("--seed", type=int, default=1337)
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -108,7 +110,8 @@ def main() -> None:
     passed = 0
     print(f"checkpoint: {args.checkpoint}")
     for prompt in PROMPTS:
-        answer = generate_answer(model, tokenizer, prompt, args.max_new_tokens, args.temperature, args.top_k)
+        with isolated_rng(args.seed, device=str(next(model.parameters()).device)):
+            answer = generate_answer(model, tokenizer, prompt, args.max_new_tokens, args.temperature, args.top_k)
         ok, reason = check_answer(prompt, answer)
         passed += int(ok)
         print(f"{'PASS' if ok else 'FAIL'} | {prompt}")

@@ -11,7 +11,12 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from .eval_prompts import EvaluationPrompt, registered_evaluation_prompts
+from .eval_prompts import (
+    EVALUATION_PROMPT_REGISTRY_VERSION,
+    EvaluationPrompt,
+    registered_evaluation_prompts,
+    registered_evaluation_suites,
+)
 from .provenance import (
     HASH_ALGORITHM,
     ProvenanceValidationError,
@@ -123,6 +128,7 @@ class DocumentPlan:
     train_documents: tuple[Document, ...]
     validation_documents: tuple[Document, ...]
     findings: tuple[ContaminationFinding, ...]
+    audited_prompts: tuple[EvaluationPrompt, ...]
     assignments: Mapping[str, str]
     split_seed: int
     validation_ratio: float
@@ -544,9 +550,12 @@ def plan_document_dataset(
     prompts: Iterable[EvaluationPrompt] | None = None,
 ) -> DocumentPlan:
     source_documents = tuple(sorted(documents, key=_document_sort_key))
+    prompt_records = tuple(
+        registered_evaluation_prompts() if prompts is None else prompts
+    )
     duplicates = deduplicate_documents(source_documents)
     pre_split_findings = detect_evaluation_contamination(
-        source_documents, prompts=prompts, dataset_split="pre-split"
+        source_documents, prompts=prompt_records, dataset_split="pre-split"
     )
     if pre_split_findings and not allow_eval_contamination:
         raise EvaluationContaminationError(pre_split_findings)
@@ -578,6 +587,7 @@ def plan_document_dataset(
         train_documents=train,
         validation_documents=validation,
         findings=findings,
+        audited_prompts=prompt_records,
         assignments=dict(sorted(assignments.items())),
         split_seed=seed,
         validation_ratio=float(validation_ratio),
@@ -610,6 +620,24 @@ def build_data_quality_report(
                 ],
             }
         )
+    suite_versions = {
+        suite.suite_id: suite.version for suite in registered_evaluation_suites()
+    }
+    suite_order: list[str] = []
+    prompt_ids_by_suite: dict[str, list[str]] = {}
+    for prompt in plan.audited_prompts:
+        if prompt.suite not in prompt_ids_by_suite:
+            suite_order.append(prompt.suite)
+            prompt_ids_by_suite[prompt.suite] = []
+        prompt_ids_by_suite[prompt.suite].append(prompt.prompt_id)
+    audit_suites = [
+        {
+            "suite_id": suite_id,
+            "suite_version": suite_versions.get(suite_id, 1),
+            "prompt_ids": prompt_ids_by_suite[suite_id],
+        }
+        for suite_id in suite_order
+    ]
     report: dict[str, Any] = {
         "version": DATA_QUALITY_REPORT_VERSION,
         "algorithm": HASH_ALGORITHM,
@@ -638,6 +666,10 @@ def build_data_quality_report(
         },
         "removed_duplicate_groups": removed_groups,
         "contamination_findings": [finding.as_dict() for finding in plan.findings],
+        "evaluation_audit": {
+            "registry_version": EVALUATION_PROMPT_REGISTRY_VERSION,
+            "suites": audit_suites,
+        },
         "leakage_validation": "passed",
         "policy": {
             "allow_eval_contamination": plan.allow_eval_contamination,
@@ -716,6 +748,54 @@ def validate_data_quality_report(report: Mapping[str, Any]) -> None:
         raise ProvenanceValidationError(
             "Data-quality report must record passed leakage validation."
         )
+    audit = report.get("evaluation_audit")
+    audited_pairs: set[tuple[str, str]] | None = None
+    if audit is not None:
+        if (
+            not isinstance(audit, Mapping)
+            or audit.get("registry_version") != EVALUATION_PROMPT_REGISTRY_VERSION
+            or not isinstance(audit.get("suites"), list)
+        ):
+            raise ProvenanceValidationError(
+                "Data-quality evaluation audit metadata is malformed."
+            )
+        audited_pairs = set()
+        suite_ids: set[str] = set()
+        for suite in audit["suites"]:
+            if not isinstance(suite, Mapping) or set(suite) != {
+                "suite_id",
+                "suite_version",
+                "prompt_ids",
+            }:
+                raise ProvenanceValidationError(
+                    "Data-quality evaluation audit suite metadata is malformed."
+                )
+            suite_id = suite["suite_id"]
+            suite_version = suite["suite_version"]
+            prompt_ids = suite["prompt_ids"]
+            if (
+                not isinstance(suite_id, str)
+                or not suite_id.strip()
+                or suite_id in suite_ids
+                or suite_version != 1
+                or not isinstance(prompt_ids, list)
+                or not all(
+                    isinstance(prompt_id, str) and prompt_id.strip()
+                    for prompt_id in prompt_ids
+                )
+                or len(prompt_ids) != len(set(prompt_ids))
+            ):
+                raise ProvenanceValidationError(
+                    "Data-quality evaluation audit suite identity is invalid."
+                )
+            suite_ids.add(suite_id)
+            for prompt_id in prompt_ids:
+                pair = (suite_id, prompt_id)
+                if pair in audited_pairs:
+                    raise ProvenanceValidationError(
+                        "Data-quality evaluation audit contains duplicate prompt identity."
+                    )
+                audited_pairs.add(pair)
     findings = report.get("contamination_findings")
     removed = report.get("removed_duplicate_groups")
     if not isinstance(findings, list) or not isinstance(removed, list):
@@ -766,6 +846,12 @@ def validate_data_quality_report(report: Mapping[str, Any]) -> None:
         ):
             raise ProvenanceValidationError(
                 "Data-quality contamination identity fields must be non-empty text."
+            )
+        if audited_pairs is not None and (
+            finding["suite"], finding["prompt_id"]
+        ) not in audited_pairs:
+            raise ProvenanceValidationError(
+                "Data-quality contamination finding is outside recorded audit coverage."
             )
         if finding["dataset_split"] not in {"train", "validation"}:
             raise ProvenanceValidationError(
