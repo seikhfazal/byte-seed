@@ -22,7 +22,12 @@ from src.byteseed.checkpoint import CheckpointOperation, load_checkpoint
 from src.byteseed.config import load_config
 from src.byteseed.eval_prompts import ANCHOR_RETENTION_PROMPTS
 from src.byteseed.evaluation import logical_checkpoint_identity
-from src.byteseed.generate import load_model, marker_id, stop_token_ids
+from src.byteseed.generate import (
+    load_model,
+    marker_id,
+    stop_token_ids,
+    validate_generation_execution_options,
+)
 from src.byteseed.provenance import canonical_sha256, sha256_file
 from src.byteseed.tokenizer import ByteSeedTokenizer
 
@@ -74,6 +79,7 @@ def run_generation(
     temperature: float,
     top_k: int | None,
     repetition_penalty: float = 1.0,
+    use_kv_cache: bool = False,
 ) -> torch.Tensor:
     with torch.inference_mode():
         return model.generate(
@@ -84,12 +90,11 @@ def run_generation(
             repetition_penalty=repetition_penalty,
             vocab_limit=tokenizer.vocab_size,
             stop_token_ids=stops,
+            use_kv_cache=use_kv_cache,
         )
 
 
-def main() -> None:
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Benchmark ByteSeed generation latency and throughput.")
     parser.add_argument("--config", default="configs/byteseed_12m.yaml")
     parser.add_argument("--checkpoint", default="checkpoints/anchor_v2_3_finetuned.pt")
@@ -110,10 +115,25 @@ def main() -> None:
     )
     parser.add_argument("--dtype", choices=("auto", "fp32", "fp16"), default="auto")
     parser.add_argument("--compile", action="store_true", help="Try torch.compile on the model forward pass. Experimental and off by default.")
+    parser.add_argument(
+        "--kv-cache",
+        action="store_true",
+        help="Benchmark with an inference-only per-request KV cache. Off by default.",
+    )
     parser.add_argument("--deterministic-algorithms", action="store_true")
     parser.add_argument("--output-json", default=None)
     parser.add_argument("--overwrite", action="store_true")
-    args = parser.parse_args()
+    return parser
+
+
+def main() -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    args = build_parser().parse_args()
+    validate_generation_execution_options(
+        compile_enabled=args.compile,
+        use_kv_cache=args.kv_cache,
+    )
 
     cfg = load_config(
         args.config,
@@ -156,6 +176,7 @@ def main() -> None:
         ),
         input_token_count=ids.shape[1],
         attention_backend=model.attention_backend,
+        kv_cache=args.kv_cache,
     )
 
     def run_once() -> int:
@@ -168,6 +189,7 @@ def main() -> None:
             args.temperature,
             args.top_k,
             args.repetition_penalty,
+            args.kv_cache,
         )
         return int(output.shape[1] - ids.shape[1])
 

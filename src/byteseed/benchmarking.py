@@ -17,9 +17,9 @@ from .evaluation import EvaluationValidationError, isolated_rng
 from .provenance import canonical_sha256
 
 
-BENCHMARK_REPORT_VERSION = 2
-GENERATION_BENCHMARK_VERSION = 2
-SUPPORTED_BENCHMARK_REPORT_VERSIONS = (1, 2)
+BENCHMARK_REPORT_VERSION = 3
+GENERATION_BENCHMARK_VERSION = 3
+SUPPORTED_BENCHMARK_REPORT_VERSIONS = (1, 2, 3)
 BENCHMARK_REPORT_KIND = "generation_benchmark"
 
 
@@ -46,6 +46,7 @@ class BenchmarkConfig:
     prompt_digest: str = ""
     input_token_count: int = 0
     attention_backend: str = "manual"
+    kv_cache: bool = False
 
     def validate(self) -> None:
         if isinstance(self.seed, bool) or not isinstance(self.seed, int):
@@ -89,6 +90,12 @@ class BenchmarkConfig:
             raise BenchmarkValidationError(
                 "benchmark attention_backend must be manual or sdpa"
             )
+        if not isinstance(self.kv_cache, bool):
+            raise BenchmarkValidationError("benchmark kv_cache must be boolean")
+        if self.compile and self.kv_cache:
+            raise BenchmarkValidationError(
+                "benchmark compile and kv_cache cannot both be enabled"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         self.validate()
@@ -110,6 +117,7 @@ class BenchmarkConfig:
             "prompt_digest": self.prompt_digest,
             "input_token_count": self.input_token_count,
             "attention_backend": self.attention_backend,
+            "kv_cache": self.kv_cache,
         }
 
 
@@ -335,6 +343,8 @@ def validate_benchmark_report(report: Mapping[str, Any]) -> None:
     }
     if version >= 2:
         required_configuration.add("attention_backend")
+    if version >= 3:
+        required_configuration.add("kv_cache")
     if set(configuration) != required_configuration:
         raise BenchmarkValidationError(
             "benchmark configuration is missing or malformed"
@@ -360,7 +370,12 @@ def validate_benchmark_report(report: Mapping[str, Any]) -> None:
         prompt_digest=configuration["prompt_digest"],
         input_token_count=configuration["input_token_count"],
         attention_backend=configuration.get("attention_backend", "manual"),
+        kv_cache=configuration.get("kv_cache", False),
     )
+    if not isinstance(config.kv_cache, bool):
+        raise BenchmarkValidationError(
+            "benchmark kv_cache configuration field must be boolean"
+        )
     if not isinstance(config.compile, bool) or not isinstance(
         config.deterministic_algorithms, bool
     ):
@@ -572,6 +587,7 @@ def render_benchmark_report(report: Mapping[str, Any]) -> str:
         f"Device: {config['device']}",
         f"Dtype: {config['dtype']}",
         f"Attention backend: {config.get('attention_backend', 'manual')}",
+        f"KV cache: {'on' if config.get('kv_cache', False) else 'off'}",
         f"Warm-up runs: {config['warmup_runs']} (excluded)",
         f"Measured runs: {config['measured_runs']}",
         f"Mean latency: {aggregate['mean_elapsed_seconds']:.4f} s",

@@ -10,7 +10,12 @@ from pathlib import Path
 import torch
 
 from .config import load_config
-from .generate import load_model, marker_id, stop_token_ids
+from .generate import (
+    load_model,
+    marker_id,
+    stop_token_ids,
+    validate_generation_execution_options,
+)
 from .tokenizer import ByteSeedTokenizer
 from .utils import latest_checkpoint
 
@@ -115,6 +120,7 @@ def print_banner(
     dtype_name: str,
     compiled: bool,
     attention_backend: str = "manual",
+    use_kv_cache: bool = False,
 ) -> None:
     line = "=" * 60
     top_k_text = "none" if top_k is None else str(top_k)
@@ -128,6 +134,7 @@ def print_banner(
     print(f"dtype: {dtype_name}")
     print(f"compile: {'on' if compiled else 'off'}")
     print(f"Attention backend: {attention_backend}")
+    print(f"KV cache: {'on' if use_kv_cache else 'off'}")
     print(f"preset: {preset}")
     print(f"temp: {temperature:g} | top_k: {top_k_text} | max_new: {max_new_tokens}")
     print(f"repetition_penalty: {repetition_penalty:g}")
@@ -275,6 +282,7 @@ def generate_reply(
     top_k: int | None,
     max_new_tokens: int,
     repetition_penalty: float,
+    use_kv_cache: bool = False,
 ) -> tuple[str, str]:
     device = next(model.parameters()).device
     input_ids = tokenizer.encode(prompt, add_bos=True)
@@ -288,6 +296,7 @@ def generate_reply(
             vocab_limit=tokenizer.vocab_size,
             stop_token_ids=stops,
             repetition_penalty=repetition_penalty,
+            use_kv_cache=use_kv_cache,
         )
     new_token_ids = out[0, ids.shape[1] :].tolist()
     raw_text = tokenizer.decode(new_token_ids)
@@ -295,6 +304,11 @@ def generate_reply(
 
 
 def run_chat(args: argparse.Namespace) -> None:
+    use_kv_cache = bool(getattr(args, "kv_cache", False))
+    validate_generation_execution_options(
+        compile_enabled=bool(args.compile),
+        use_kv_cache=use_kv_cache,
+    )
     cfg = load_config(
         args.config,
         {"attention_backend": getattr(args, "attention_backend", None)},
@@ -336,6 +350,7 @@ def run_chat(args: argparse.Namespace) -> None:
         dtype_name,
         compiled,
         model.attention_backend,
+        use_kv_cache,
     )
     while True:
         try:
@@ -364,6 +379,7 @@ def run_chat(args: argparse.Namespace) -> None:
             top_k=int(settings["top_k"]) if settings["top_k"] is not None else None,
             max_new_tokens=int(settings["max_new_tokens"] or 1),
             repetition_penalty=float(settings["repetition_penalty"] or 1.0),
+            use_kv_cache=use_kv_cache,
         )
         if is_degenerate_reply(assistant):
             raw_text, assistant = generate_reply(
@@ -375,6 +391,7 @@ def run_chat(args: argparse.Namespace) -> None:
                 top_k=10,
                 max_new_tokens=max(120, int(settings["max_new_tokens"] or 1)),
                 repetition_penalty=float(settings["repetition_penalty"] or 1.0),
+                use_kv_cache=use_kv_cache,
             )
         if settings["raw"]:
             print(f"raw: {raw_text!r}")
@@ -398,6 +415,11 @@ def build_parser(default_config: str, default_checkpoint: str | None, default_pr
     parser.add_argument("--top-k", type=int, default=None, help="Override the selected preset top_k.")
     parser.add_argument("--dtype", choices=("auto", "fp32", "fp16"), default="auto", help="Inference dtype. auto uses fp16 on CUDA and fp32 on CPU.")
     parser.add_argument("--compile", action="store_true", help="Try torch.compile on the model forward pass. Experimental and off by default.")
+    parser.add_argument(
+        "--kv-cache",
+        action="store_true",
+        help="Use an inference-only per-request KV cache. Off by default.",
+    )
     parser.add_argument(
         "--attention-backend",
         choices=("manual", "sdpa", "auto"),

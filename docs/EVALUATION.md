@@ -129,14 +129,18 @@ python scripts/benchmark_generation.py `
   --seed 1337 `
   --warmup-runs 2 `
   --runs 10 `
-  --output-json runs\benchmarks\generation-v2.json
+  --output-json runs\benchmarks\generation-v3.json
 ```
 
-Benchmark report version 2 records the resolved `manual` or `sdpa` attention backend in the canonical configuration identity in addition to the version-1 fields: benchmark version; seed; path-safe checkpoint, model, and tokenizer identities; device, dtype, and actual compile status; warm-up and measured-run counts; prompt digest and input-token count; generation settings; ordered per-run elapsed time, generated tokens, and throughput; aggregate latency and tokens per second; valid peak CUDA memory when applicable; warnings; and a canonical digest. The report loader continues to validate version-1 reports and interprets their absent backend as `manual`.
+Add `--kv-cache` to measure the optional request-local inference cache. Omitting it measures the established uncached reference path. The current script rejects `--compile` together with `--kv-cache`; growing cache shapes are outside the supported compile wrapper.
+
+Benchmark report version 3 records the resolved `manual` or `sdpa` attention backend and a boolean `kv_cache` field in the canonical configuration identity, in addition to the timing and identity fields established by earlier versions. This prevents cached and uncached runs from sharing a report digest. The loader continues to validate version-1 and version-2 reports: a version-1 report without backend/cache fields means manual and uncached, while a version-2 report without the cache field means uncached.
 
 Manual attention is the default. `--attention-backend sdpa` requests PyTorch SDPA and fails if the API is unavailable; `auto` uses SDPA when available and otherwise resolves to manual. Availability and performance depend on the PyTorch build, device, dtype, shape, and internal kernel selection. Reports identify the resolved backend without claiming a particular kernel or universal speedup. Checkpoint weights remain compatible between backends, while exact training resume requires the same backend.
 
 CPU reports use `null` for peak CUDA memory. CUDA reports require a valid measured value. Warm-up results never enter measured aggregates. Timing values and report digests that contain them are environment-dependent; they are not reproducible performance claims across unlike machines. ByteSeed does not compare these measurements with external models or claim benchmark superiority.
+
+KV caching is inference-only and off by default. It supports both attention implementations and reuses projected keys and values only while prompt plus generated tokens fit within `block_size`. When learned absolute positions would be reassigned by context cropping, ByteSeed discards the cache and uses uncached generation for the rest of the request. Cache state is not serialized or reused across requests. Any performance difference depends on the device, dtype, backend, sequence length, and workload.
 
 ## Current claims
 

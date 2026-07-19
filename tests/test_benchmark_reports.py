@@ -43,6 +43,7 @@ def _config(**overrides):
         "prompt_digest": "a" * 64,
         "input_token_count": 3,
         "attention_backend": "manual",
+        "kv_cache": False,
     }
     values.update(overrides)
     return BenchmarkConfig(**values)
@@ -98,9 +99,9 @@ def test_tokens_per_second_and_aggregates_are_exact():
     report = _report()
     aggregate = report["measurements"]["aggregate"]
 
-    assert report["version"] == 2
+    assert report["version"] == 3
     assert report["kind"] == "generation_benchmark"
-    assert report["benchmark_version"] == 2
+    assert report["benchmark_version"] == 3
     assert aggregate["total_elapsed_seconds"] == 1.5
     assert aggregate["total_generated_tokens"] == 7
     assert aggregate["tokens_per_second"] == pytest.approx(7 / 1.5)
@@ -152,7 +153,7 @@ def test_report_digest_future_version_wrong_kind_and_tampering_fail():
     )
 
     future = dict(report)
-    future["version"] = 3
+    future["version"] = 4
     with pytest.raises(BenchmarkValidationError, match="future benchmark report version"):
         validate_benchmark_report(future)
 
@@ -198,16 +199,42 @@ def test_attention_backend_is_identity_validated_and_rendered():
         validate_benchmark_report(invalid)
 
 
-def test_legacy_version_one_report_remains_valid_as_manual():
+def test_kv_cache_is_identity_validated_and_rendered():
+    uncached = _report()
+    cached = build_benchmark_report(
+        _config(kv_cache=True),
+        (BenchmarkRun(1, 0.5, 4), BenchmarkRun(2, 1.0, 3)),
+        environment=ENVIRONMENT,
+    )
+
+    assert uncached["configuration"]["kv_cache"] is False
+    assert cached["configuration"]["kv_cache"] is True
+    assert uncached["digest"] != cached["digest"]
+    assert "KV cache: on" in render_benchmark_report(cached)
+
+    invalid = json.loads(json.dumps(uncached))
+    invalid["configuration"]["kv_cache"] = "yes"
+    invalid["digest"] = canonical_sha256(
+        {key: value for key, value in invalid.items() if key != "digest"}
+    )
+    with pytest.raises(BenchmarkValidationError, match="kv_cache"):
+        validate_benchmark_report(invalid)
+
+
+@pytest.mark.parametrize("version", [1, 2])
+def test_legacy_reports_remain_valid_and_default_to_uncached(version):
     legacy = json.loads(json.dumps(_report()))
-    legacy["version"] = 1
-    legacy["benchmark_version"] = 1
-    legacy["configuration"].pop("attention_backend")
+    legacy["version"] = version
+    legacy["benchmark_version"] = version
+    legacy["configuration"].pop("kv_cache")
+    if version == 1:
+        legacy["configuration"].pop("attention_backend")
     legacy["digest"] = canonical_sha256(
         {key: value for key, value in legacy.items() if key != "digest"}
     )
 
     validate_benchmark_report(legacy)
+    assert "KV cache: off" in render_benchmark_report(legacy)
 
 
 def test_utf8_writing_creates_parent_and_refuses_silent_overwrite(tmp_path):

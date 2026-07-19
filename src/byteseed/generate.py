@@ -138,6 +138,18 @@ def trim_chat_text(text: str, prompt: str = "") -> str:
     return text.strip()
 
 
+def validate_generation_execution_options(
+    *,
+    compile_enabled: bool,
+    use_kv_cache: bool,
+) -> None:
+    if compile_enabled and use_kv_cache:
+        raise ValueError(
+            "--compile and --kv-cache cannot be combined: growing per-token cache "
+            "shapes are not supported by ByteSeed's current compile wrapper."
+        )
+
+
 def complete(
     config_path: str,
     prompt: str,
@@ -148,6 +160,7 @@ def complete(
     json_mode: bool = False,
     stop_at_end: bool | None = None,
     attention_backend: str | None = None,
+    use_kv_cache: bool = False,
 ) -> str:
     cfg = load_config(config_path, {"attention_backend": attention_backend})
     tokenizer = ByteSeedTokenizer(cfg.tokenizer_dir)
@@ -165,6 +178,7 @@ def complete(
         top_k=top_k,
         vocab_limit=tokenizer.vocab_size,
         stop_token_ids=stop_token_ids(tokenizer, stop_at_end),
+        use_kv_cache=use_kv_cache,
     )
     text = tokenizer.decode(out[0].tolist())
     text = trim_chat_text(text, prompt) if stop_at_end else text
@@ -173,9 +187,7 @@ def complete(
     return text
 
 
-def main() -> None:
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/byteseed_12m.yaml")
     parser.add_argument("--checkpoint", default=None)
@@ -191,8 +203,32 @@ def main() -> None:
         default=None,
         help="Attention implementation. Default: config value (manual when omitted).",
     )
-    args = parser.parse_args()
-    print(complete(args.config, args.prompt, args.checkpoint, args.max_new_tokens, args.temperature, args.top_k, args.json, args.stop_at_end, args.attention_backend))
+    parser.add_argument(
+        "--kv-cache",
+        action="store_true",
+        help="Use an inference-only per-request KV cache. Off by default.",
+    )
+    return parser
+
+
+def main() -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    args = build_parser().parse_args()
+    print(
+        complete(
+            args.config,
+            args.prompt,
+            args.checkpoint,
+            args.max_new_tokens,
+            args.temperature,
+            args.top_k,
+            args.json,
+            args.stop_at_end,
+            args.attention_backend,
+            args.kv_cache,
+        )
+    )
 
 
 if __name__ == "__main__":

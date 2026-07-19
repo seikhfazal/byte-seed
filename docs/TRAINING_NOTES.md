@@ -74,7 +74,15 @@ Manual attention is the backward-compatible default and educational reference. `
 
 The two paths use the same QKV/output projections, tensor shapes, parameters, state-dict keys, and checkpoint weights. Manual and SDPA checkpoints are therefore mutually loadable for inference or an explicitly chosen new run. Exact pretraining continuation is different: operation ordering and dropout RNG consumption are backend-sensitive, so exact resume requires the same resolved backend. An explicit `--allow-inexact-resume` with an explicit checkpoint may change only this execution choice when all other critical settings match, and emits a warning that continuation is not exact.
 
-The option is available on pretraining, SFT, generation, chat, stable evaluation, and generation-benchmark entry points. Evaluation and generation behavior outside attention execution is unchanged. KV caching remains unimplemented.
+The backend option is available on pretraining, SFT, generation, chat, stable evaluation, and generation-benchmark entry points. Evaluation and generation behavior outside attention execution is unchanged.
+
+### Inference-only KV cache
+
+Generation and chat accept --kv-cache as an explicit execution option; it is off by default and is not part of ByteSeedConfig, checkpoint compatibility, training, SFT, or exact-resume state. Manual and SDPA attention both use the same request-local tuple of one key/value tensor pair per layer. Prompt prefill records the full active context, and each subsequent decode step projects only the newest token while the cache remains valid.
+
+Learned absolute position indices begin at zero during prefill and advance from the validated cache length. When prompt plus generated tokens fill block_size and the context window would slide, ByteSeed invalidates the cache and remains on the established cropped, uncached path for the rest of that request. It does not evict old cache entries because their surviving representations contain the prior absolute positions. Cache tensors are discarded after each generate call and are never stored in checkpoints or reused across chat turns.
+
+The current inference wrapper rejects --compile together with --kv-cache because growing cache shapes have not been established as safe for its experimental compile path. Actual cached/uncached performance depends on device, dtype, attention backend, sequence length, and workload; no universal speedup is claimed.
 
 ## Document-Aware Data Preparation
 

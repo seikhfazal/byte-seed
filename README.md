@@ -22,6 +22,7 @@ The project supports local CPU and CUDA execution, pretraining, supervised fine-
 ## Highlights
 
 - Decoder-only causal Transformer with manual multi-head causal self-attention by default and optional PyTorch SDPA execution.
+- Optional inference-only KV caching for manual, SDPA, and auto-selected attention.
 - Learned token and position embeddings, pre-norm residual blocks, LayerNorm, GELU MLPs, dropout, and tied input/output embeddings.
 - SentencePiece BPE tokenization with required chat control tokens.
 - Local pretraining, example-wise SFT, evaluation, generation benchmarking, and terminal chat.
@@ -111,6 +112,14 @@ The base runtime dependencies are declared in [pyproject.toml](pyproject.toml); 
 python chat.py
 ```
 
+Plain chat remains uncached. Add --kv-cache to reuse each layer's projected keys and values during one generation request:
+
+~~~powershell
+python chat.py --kv-cache
+~~~
+
+The optional cache is inference-only, works with manual and SDPA attention, and is discarded after every reply. It does not change model weights or checkpoint data. With learned absolute positions, ByteSeed invalidates the cache and uses the existing uncached path once the active context window must slide. The current inference wrapper rejects --compile together with --kv-cache.
+
 To choose the stable local checkpoint explicitly:
 
 ```powershell
@@ -188,7 +197,7 @@ To mirror the source compilation check used by CI:
 python -m compileall -q src scripts chat.py tests
 ```
 
-GitHub Actions runs CPU-only tests on Ubuntu with Python 3.11. The suite uses small synthetic models and temporary artifacts; it covers manual/SDPA attention parity, causal behavior, model shapes, generation, tokenizer handling, datasets and SFT masking, checkpoint schema and selection, exact resume, provenance, document splitting, evaluation contamination, RNG isolation, and evaluation/benchmark report validation. It does not require local checkpoints, tokenizer binaries, CUDA, or network access. See [Testing](docs/TESTING.md).
+GitHub Actions runs CPU-only tests on Ubuntu with Python 3.11. The suite uses small synthetic models and temporary artifacts; it covers manual/SDPA attention parity, KV-cache prefill/decode/rollover parity, causal behavior, model shapes, generation, tokenizer handling, datasets and SFT masking, checkpoint schema and selection, exact resume, provenance, document splitting, evaluation contamination, RNG isolation, and evaluation/benchmark report validation. It does not require local checkpoints, tokenizer binaries, CUDA, or network access. See [Testing](docs/TESTING.md).
 
 ## Repository structure
 
@@ -212,7 +221,7 @@ GitHub Actions runs CPU-only tests on Ubuntu with Python 3.11. The suite uses sm
 - The current checkpoint is best treated as a local, single-turn assistant experiment. Multi-turn history is off by default because the training examples are mostly single-turn.
 - Outputs can hallucinate, repeat, or confuse concepts outside the Anchor training material. Do not use them for factual, medical, legal, financial, security-critical, or other high-stakes decisions.
 - The historical Anchor score is a retention regression with known training overlap; held-out generalization has not been measured.
-- Generation recomputes attention over the active context at each token; KV caching remains unimplemented. Manual attention remains the default educational reference, while optional SDPA availability and performance depend on PyTorch, device, dtype, and input shape.
+- KV caching is optional and off by default. It avoids repeated key/value projection only while the active learned-position context fits within block_size; rollover uses uncached generation for correctness. Actual benefit depends on device, dtype, sequence length, backend, and workload.
 - There is no distributed-training workflow or broad benchmark suite.
 
 ## Roadmap
@@ -222,7 +231,7 @@ Repository audits identify the following next areas of work:
 - A provenance-verified candidate paraphrase run and broader held-out evaluation coverage.
 - Expanded clean, reviewed training corpora and stronger SFT data quality checks.
 - Broader environment-aware benchmark methodology without cross-system superiority claims.
-- An optional KV-cache path only with uncached/cached parity testing and correct positional rollover.
+- Environment-specific cached/uncached measurements without universal performance claims.
 - Packaging and public-artifact polish, including a documented policy for checkpoint and tokenizer distribution.
 
 ## Documentation
