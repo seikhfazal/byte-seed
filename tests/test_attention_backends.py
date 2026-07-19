@@ -13,6 +13,7 @@ from byteseed.checkpoint import (
     validate_training_config,
     training_config_snapshot,
 )
+from byteseed import chat as chat_module
 from byteseed.chat import build_parser
 from byteseed.config import ByteSeedConfig, config_from_checkpoint
 from byteseed.generate import load_model
@@ -234,15 +235,42 @@ def test_legacy_exact_resume_metadata_defaults_to_manual(tiny_config):
     validate_training_config(legacy, current)
 
 
-def test_chat_cli_backend_values_and_default():
+def test_chat_cli_defaults_to_auto_and_accepts_explicit_overrides():
     parser = build_parser("config.yaml", None, "precise")
 
-    assert parser.parse_args([]).attention_backend is None
+    assert parser.parse_args([]).attention_backend == "auto"
     assert parser.parse_args(["--attention-backend", "manual"]).attention_backend == "manual"
     assert parser.parse_args(["--attention-backend", "sdpa"]).attention_backend == "sdpa"
     assert parser.parse_args(["--attention-backend", "auto"]).attention_backend == "auto"
     with pytest.raises(SystemExit):
         parser.parse_args(["--attention-backend", "invalid"])
+
+
+def test_package_chat_entry_point_defaults_to_auto(monkeypatch):
+    received = {}
+    monkeypatch.setattr(chat_module, "run_chat", lambda args: received.update(vars(args)))
+
+    chat_module.main([], default_checkpoint="synthetic.pt")
+
+    assert received["attention_backend"] == "auto"
+
+
+def test_chat_auto_backend_resolves_through_model_selection(tiny_config, monkeypatch):
+    parser = build_parser("config.yaml", None, "precise")
+    backend = parser.parse_args([]).attention_backend
+
+    monkeypatch.setattr(model_module, "sdpa_is_available", lambda: True)
+    assert GPT(_config(tiny_config, backend)).attention_backend == "sdpa"
+
+    monkeypatch.setattr(model_module, "sdpa_is_available", lambda: False)
+    assert GPT(_config(tiny_config, backend)).attention_backend == "manual"
+    assert GPT(
+        _config(tiny_config, parser.parse_args(["--attention-backend", "manual"]).attention_backend)
+    ).attention_backend == "manual"
+    with pytest.raises(RuntimeError, match="scaled_dot_product_attention"):
+        GPT(
+            _config(tiny_config, parser.parse_args(["--attention-backend", "sdpa"]).attention_backend)
+        )
 
 
 def test_controlled_generation_matches_between_backends(tiny_config):

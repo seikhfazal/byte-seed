@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from byteseed.chat import clean_assistant_output, is_degenerate_reply
+import torch
+
+from byteseed.chat import clean_assistant_output, is_degenerate_reply, print_banner
 
 
 def test_cleanup_trims_special_tokens_and_artificial_labels():
@@ -18,3 +20,23 @@ def test_empty_and_punctuation_only_replies_are_degenerate():
     assert is_degenerate_reply("   ")
     assert is_degenerate_reply("?!...")
     assert not is_degenerate_reply("A useful answer.")
+
+
+def test_chat_banner_identifies_resolved_attention_backend(capsys):
+    print_banner(
+        "ByteSeed-Test",
+        17,
+        torch.device("cpu"),
+        "synthetic.pt",
+        "precise",
+        0.2,
+        5,
+        80,
+        False,
+        1.0,
+        "fp32",
+        False,
+        "sdpa",
+    )
+
+    assert "Attention backend: sdpa" in capsys.readouterr().out

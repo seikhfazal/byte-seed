@@ -105,7 +105,7 @@ The base runtime dependencies are declared in [pyproject.toml](pyproject.toml); 
 
 ## Quick start
 
-`chat.py` starts the local terminal interface with the `ByteSeed-12M` configuration and the `precise` preset. It selects the first available preferred local checkpoint, with `anchor_v2_3_finetuned.pt` first in that order.
+`chat.py` starts the local terminal interface with the `ByteSeed-12M` configuration and the `precise` preset. It selects the first available preferred local checkpoint, with `anchor_v2_3_finetuned.pt` first in that order. Interactive chat defaults to `--attention-backend auto`: it uses PyTorch SDPA when available and otherwise uses manual attention. Use `--attention-backend manual` to select the reference path explicitly; training and the global model/config default remain manual.
 
 ```powershell
 python chat.py

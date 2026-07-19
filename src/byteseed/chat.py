@@ -127,7 +127,7 @@ def print_banner(
     print(f"ckpt: {checkpoint}")
     print(f"dtype: {dtype_name}")
     print(f"compile: {'on' if compiled else 'off'}")
-    print(f"attention: {attention_backend}")
+    print(f"Attention backend: {attention_backend}")
     print(f"preset: {preset}")
     print(f"temp: {temperature:g} | top_k: {top_k_text} | max_new: {max_new_tokens}")
     print(f"repetition_penalty: {repetition_penalty:g}")
@@ -401,8 +401,8 @@ def build_parser(default_config: str, default_checkpoint: str | None, default_pr
     parser.add_argument(
         "--attention-backend",
         choices=("manual", "sdpa", "auto"),
-        default=None,
-        help="Attention implementation. Default: config value (manual when omitted).",
+        default="auto",
+        help="Attention implementation. Default: auto for interactive chat.",
     )
     parser.add_argument("--repetition-penalty", type=float, default=1.0, help="Optional generation repetition penalty. Default preserves existing behavior.")
     parser.add_argument("--history-turns", type=int, default=0, help="Enable startup history mode and keep up to this many previous turns, capped at 2. Default is stateless.")

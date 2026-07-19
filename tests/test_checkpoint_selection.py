@@ -4,6 +4,7 @@ import importlib.util
 import sys
 from pathlib import Path
 
+from byteseed import pretrain as pretrain_module
 from byteseed import chat as chat_module
 
 
@@ -45,3 +46,17 @@ def test_root_chat_default_falls_back_to_last_documented_name(monkeypatch):
     monkeypatch.setattr(root_chat, "PREFERRED_CHECKPOINTS", ("missing-first.pt", "fallback.pt"))
 
     assert root_chat.default_checkpoint() == "fallback.pt"
+
+
+def test_pretraining_cli_keeps_config_attention_backend_default(monkeypatch):
+    received = {}
+    monkeypatch.setattr(
+        pretrain_module,
+        "train",
+        lambda *args: received.update(attention_backend=args[-1]),
+    )
+    monkeypatch.setattr(sys, "argv", ["pretrain"])
+
+    pretrain_module.main()
+
+    assert received["attention_backend"] is None
