@@ -46,7 +46,7 @@ Useful anchor checkpoints produced during development:
 - `iter` means the last fully completed optimizer step, including any evaluation and early-stopping update associated with that step. Resume starts at `iter + 1`, preserving learning-rate, evaluation, and checkpoint cadence without repeating or skipping a step.
 - A checkpoint is captured after `optimizer.step()`, `GradScaler.update()`, evaluation, and early-stopping state updates. Its RNG state therefore describes the next operation after that coherent continuation point.
 - On exact resume, ByteSeed constructs the dataset, model, optimizer, and scaler; loads model/optimizer/scaler state; moves nested optimizer tensors to the parameter device; validates configuration; and restores RNG state last, immediately before the first resumed batch draw.
-- Exact resume validates architecture and training settings, including block/model dimensions, dropout, batch and accumulation sizes, AdamW settings, learning rate/schedule, weight decay, warm-up, evaluation cadence, maximum iterations, seed, device type, AMP mode, and early-stopping patience. Machine-specific data paths are not identity fields; tokenizer bytes, corpus bytes, and split/preprocessing identity are validated through the manifest instead. Differing critical fields fail clearly.
+- Exact resume validates architecture and training settings, including block/model dimensions, dropout, attention backend, batch and accumulation sizes, AdamW settings, learning rate/schedule, weight decay, warm-up, evaluation cadence, maximum iterations, seed, device type, AMP mode, and early-stopping patience. Machine-specific data paths are not identity fields; tokenizer bytes, corpus bytes, and split/preprocessing identity are validated through the manifest instead. Differing critical fields fail clearly. Resume metadata created before the backend field is interpreted as `manual`, because that was the only implementation available.
 - `--resume-checkpoint` selects one explicit checkpoint and never falls back. A PR 4 state-complete checkpoint without provenance, a partial PR 3 checkpoint, or a legacy pretraining checkpoint fails exact resume by default.
 - Inexact continuation is available only with both an explicit path and `--allow-inexact-resume`. Missing execution state or missing/data-mismatched provenance produces a prominent warning and is never described as exact. A known tokenizer mismatch is always rejected, even with this opt-in.
 - Legacy Anchor-like checkpoints remain loadable for inference and are identified with a focused warning as unverified rather than cryptographically compatible. Structurally complete legacy pretraining checkpoints remain recognizable for explicit inexact continuation.
@@ -67,6 +67,14 @@ python -m byteseed.pretrain --config configs/byteseed_12m.yaml --resume-checkpoi
 ```
 
 The exact-resume guarantee is intentionally bounded: with the same supported software/hardware conditions, deterministic operations, matching training-critical configuration, and matching tokenizer/data manifests, continuation restores the same next stochastic and optimizer state. It does not promise bitwise identity across CPU and CUDA, different GPUs, different PyTorch/CUDA versions, nondeterministic kernels, or changed data/tokenizers.
+
+### Attention backend
+
+Manual attention is the backward-compatible default and educational reference. `--attention-backend sdpa` selects `torch.nn.functional.scaled_dot_product_attention` and fails clearly if the installed PyTorch build does not expose it. `--attention-backend auto` selects SDPA when the API is available and otherwise falls back to manual; startup diagnostics and reports record the resolved backend. PyTorch controls the internal kernel choice, which can vary with device, dtype, build, and tensor shape, so SDPA is not claimed to be universally faster or to imply a particular CUDA kernel.
+
+The two paths use the same QKV/output projections, tensor shapes, parameters, state-dict keys, and checkpoint weights. Manual and SDPA checkpoints are therefore mutually loadable for inference or an explicitly chosen new run. Exact pretraining continuation is different: operation ordering and dropout RNG consumption are backend-sensitive, so exact resume requires the same resolved backend. An explicit `--allow-inexact-resume` with an explicit checkpoint may change only this execution choice when all other critical settings match, and emits a warning that continuation is not exact.
+
+The option is available on pretraining, SFT, generation, chat, stable evaluation, and generation-benchmark entry points. Evaluation and generation behavior outside attention execution is unchanged. KV caching remains unimplemented.
 
 ## Document-Aware Data Preparation
 
@@ -96,7 +104,7 @@ The historical `anchor-retention-v0.2` suite remains retention-only and known co
 
 Evaluation reports record seed, temperature, `top_k`, maximum generated tokens, repetition penalty, stop-token policy, dtype, device, compile status, batch size, prompt-format version, and deterministic-algorithm status. They also include path-safe checkpoint metadata, verified tokenizer identity, data-manifest identity, contamination classification, ordered per-case outputs, transparent rubric results, aggregates, and a canonical SHA-256 digest when those identities are available.
 
-Fixed-seed stochastic output is reproducible only within the same supported software, hardware, device, dtype, and deterministic-kernel boundary. No bitwise guarantee is made across CPU/CUDA, GPU models, PyTorch/CUDA versions, or nondeterministic kernels. Generation benchmark reports record the same configuration boundary but contain environment-dependent timing measurements.
+Fixed-seed stochastic output is reproducible only within the same supported software, hardware, device, dtype, resolved attention backend, and deterministic-kernel boundary. No bitwise guarantee is made across CPU/CUDA, GPU models, PyTorch/CUDA versions, attention backends, or nondeterministic kernels. Generation benchmark reports record the same configuration boundary but contain environment-dependent timing measurements.
 
 Use `python scripts/eval_stable_v0_2.py --help` for evaluation/report options and `python scripts/benchmark_generation.py --help` for benchmark-report options. See [EVALUATION.md](EVALUATION.md) for suite semantics, contamination classifications, report schemas, and complete commands.
 

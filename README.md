@@ -21,7 +21,7 @@ The project supports local CPU and CUDA execution, pretraining, supervised fine-
 
 ## Highlights
 
-- Decoder-only causal Transformer with manually implemented multi-head causal self-attention.
+- Decoder-only causal Transformer with manual multi-head causal self-attention by default and optional PyTorch SDPA execution.
 - Learned token and position embeddings, pre-norm residual blocks, LayerNorm, GELU MLPs, dropout, and tied input/output embeddings.
 - SentencePiece BPE tokenization with required chat control tokens.
 - Local pretraining, example-wise SFT, evaluation, generation benchmarking, and terminal chat.
@@ -75,7 +75,7 @@ flowchart LR
     H --> I[Local chat]
 ```
 
-Each Transformer block applies LayerNorm, causal self-attention, a residual connection, LayerNorm, a GELU MLP, and a second residual connection. The lower-triangular attention mask prevents a token from attending to future positions. See [Architecture](docs/ARCHITECTURE.md) for the concise implementation overview.
+Each Transformer block applies LayerNorm, causal self-attention, a residual connection, LayerNorm, a GELU MLP, and a second residual connection. The default manual path uses an explicit lower-triangular mask; the optional SDPA path uses PyTorch's causal attention contract. Select `--attention-backend sdpa` (or `auto`) on supported PyTorch/device/dtype combinations. The backend changes execution only: parameters, state-dict keys, and checkpoint weights are shared. PyTorch chooses any optimized internal kernel, so no universal speedup or specific-kernel claim is made. See [Architecture](docs/ARCHITECTURE.md) for the concise implementation overview.
 
 ## Installation
 
@@ -188,7 +188,7 @@ To mirror the source compilation check used by CI:
 python -m compileall -q src scripts chat.py tests
 ```
 
-GitHub Actions runs CPU-only tests on Ubuntu with Python 3.11. The suite uses small synthetic models and temporary artifacts; it covers causal attention, model shapes, generation, tokenizer handling, datasets and SFT masking, checkpoint schema and selection, exact resume, provenance, document splitting, evaluation contamination, RNG isolation, and evaluation/benchmark report validation. It does not require local checkpoints, tokenizer binaries, CUDA, or network access. See [Testing](docs/TESTING.md).
+GitHub Actions runs CPU-only tests on Ubuntu with Python 3.11. The suite uses small synthetic models and temporary artifacts; it covers manual/SDPA attention parity, causal behavior, model shapes, generation, tokenizer handling, datasets and SFT masking, checkpoint schema and selection, exact resume, provenance, document splitting, evaluation contamination, RNG isolation, and evaluation/benchmark report validation. It does not require local checkpoints, tokenizer binaries, CUDA, or network access. See [Testing](docs/TESTING.md).
 
 ## Repository structure
 
@@ -212,7 +212,7 @@ GitHub Actions runs CPU-only tests on Ubuntu with Python 3.11. The suite uses sm
 - The current checkpoint is best treated as a local, single-turn assistant experiment. Multi-turn history is off by default because the training examples are mostly single-turn.
 - Outputs can hallucinate, repeat, or confuse concepts outside the Anchor training material. Do not use them for factual, medical, legal, financial, security-critical, or other high-stakes decisions.
 - The historical Anchor score is a retention regression with known training overlap; held-out generalization has not been measured.
-- Generation recomputes attention over the active context at each token. There is no KV cache or SDPA execution path; the manual attention implementation remains the educational reference.
+- Generation recomputes attention over the active context at each token; KV caching remains unimplemented. Manual attention remains the default educational reference, while optional SDPA availability and performance depend on PyTorch, device, dtype, and input shape.
 - There is no distributed-training workflow or broad benchmark suite.
 
 ## Roadmap
@@ -222,7 +222,7 @@ Repository audits identify the following next areas of work:
 - A provenance-verified candidate paraphrase run and broader held-out evaluation coverage.
 - Expanded clean, reviewed training corpora and stronger SFT data quality checks.
 - Broader environment-aware benchmark methodology without cross-system superiority claims.
-- Optional SDPA and KV-cache paths only with parity testing while retaining the manual implementation as the default.
+- An optional KV-cache path only with uncached/cached parity testing and correct positional rollover.
 - Packaging and public-artifact polish, including a documented policy for checkpoint and tokenizer distribution.
 
 ## Documentation

@@ -40,6 +40,11 @@ def _model_cfg_from_checkpoint(base_cfg: ByteSeedConfig, ckpt: dict[str, Any]) -
         print("Warning: checkpoint has no saved config. Inferring vocab_size and n_embd from checkpoint weights, using YAML for the rest.")
         model_cfg = base_cfg
 
+    # Attention is an execution choice, not part of the checkpoint weight format.
+    # The current invocation therefore overrides saved execution metadata.
+    model_cfg.attention_backend = base_cfg.attention_backend
+    model_cfg.validate()
+
     changed = []
     if checkpoint_vocab is not None and model_cfg.vocab_size != checkpoint_vocab:
         changed.append(f"vocab_size {model_cfg.vocab_size} -> {checkpoint_vocab}")
@@ -142,8 +147,9 @@ def complete(
     top_k: int | None,
     json_mode: bool = False,
     stop_at_end: bool | None = None,
+    attention_backend: str | None = None,
 ) -> str:
-    cfg = load_config(config_path)
+    cfg = load_config(config_path, {"attention_backend": attention_backend})
     tokenizer = ByteSeedTokenizer(cfg.tokenizer_dir)
     model = load_model(cfg, checkpoint, tokenizer=tokenizer)
     device = next(model.parameters()).device
@@ -179,8 +185,14 @@ def main() -> None:
     parser.add_argument("--top-k", type=int, default=50)
     parser.add_argument("--json", action="store_true", help="Experimental and unreliable JSON output mode.")
     parser.add_argument("--stop-at-end", action=argparse.BooleanOptionalAction, default=None, help="Stop and trim at <|end|> or a new <|user|>. Defaults on when the tokenizer has <|end|>.")
+    parser.add_argument(
+        "--attention-backend",
+        choices=("manual", "sdpa", "auto"),
+        default=None,
+        help="Attention implementation. Default: config value (manual when omitted).",
+    )
     args = parser.parse_args()
-    print(complete(args.config, args.prompt, args.checkpoint, args.max_new_tokens, args.temperature, args.top_k, args.json, args.stop_at_end))
+    print(complete(args.config, args.prompt, args.checkpoint, args.max_new_tokens, args.temperature, args.top_k, args.json, args.stop_at_end, args.attention_backend))
 
 
 if __name__ == "__main__":

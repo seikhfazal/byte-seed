@@ -38,6 +38,7 @@ TRAINING_CRITICAL_CONFIG_FIELDS = (
     "warmup_iters",
     "seed",
     "early_stopping_patience",
+    "attention_backend",
 )
 
 _TRAINING_RUNTIME_DEFAULTS = {
@@ -258,8 +259,12 @@ def validate_training_config(
         "device_type",
         "amp_enabled",
     }
-    missing_saved = sorted(required - set(saved))
-    missing_current = sorted(required - set(current))
+    # Resume-state v1 predates the optional backend field. Such checkpoints
+    # unambiguously used the manual implementation.
+    normalized_saved = {"attention_backend": "manual", **saved}
+    normalized_current = {"attention_backend": "manual", **current}
+    missing_saved = sorted(required - set(normalized_saved))
+    missing_current = sorted(required - set(normalized_current))
     if missing_saved or missing_current:
         details = []
         if missing_saved:
@@ -270,10 +275,14 @@ def validate_training_config(
             "Exact resume training configuration is incomplete: " + "; ".join(details) + "."
         )
 
-    differences = [field for field in sorted(required) if saved[field] != current[field]]
+    differences = [
+        field
+        for field in sorted(required)
+        if normalized_saved[field] != normalized_current[field]
+    ]
     if differences:
         details = ", ".join(
-            f"{field} (checkpoint={_safe_value(saved[field])}, current={_safe_value(current[field])})"
+            f"{field} (checkpoint={_safe_value(normalized_saved[field])}, current={_safe_value(normalized_current[field])})"
             for field in differences
         )
         raise CheckpointCompatibilityError(
@@ -383,7 +392,8 @@ def validate_state_complete_checkpoint(data: Mapping[str, Any]) -> Mapping[str, 
         | set(_TRAINING_RUNTIME_DEFAULTS)
         | {"device_type", "amp_enabled"}
     )
-    missing_training = sorted(required_training - set(training_config))
+    normalized_training = {"attention_backend": "manual", **training_config}
+    missing_training = sorted(required_training - set(normalized_training))
     if missing_training:
         raise CheckpointValidationError(
             "resume_state.training_config is incomplete; missing: "

@@ -131,14 +131,23 @@ class ChatSFTDataset:
         return torch.stack(xs).to(self.device), torch.stack(ys).to(self.device)
 
 
-def finetune(config_path: str, checkpoint: str | None, examples: str, iters: int, output: str | None = None, mask_prompt: bool = True) -> Path:
-    cfg = load_config(config_path)
+def finetune(
+    config_path: str,
+    checkpoint: str | None,
+    examples: str,
+    iters: int,
+    output: str | None = None,
+    mask_prompt: bool = True,
+    attention_backend: str | None = None,
+) -> Path:
+    cfg = load_config(config_path, {"attention_backend": attention_backend})
     set_seed(cfg.seed)
     tokenizer = ByteSeedTokenizer(cfg.tokenizer_dir)
     if checkpoint is None:
         cfg = align_config_to_tokenizer(cfg, tokenizer)
     model = load_model(cfg, checkpoint, tokenizer=tokenizer)
     cfg = model.config
+    print(f"Attention backend: {model.attention_backend}")
     device = cfg.resolved_device
     data = ChatSFTDataset(examples, tokenizer, cfg.block_size, device, mask_prompt=mask_prompt)
     optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.learning_rate / 3, weight_decay=cfg.weight_decay)
@@ -193,8 +202,22 @@ def main() -> None:
     parser.add_argument("--iters", type=int, default=200)
     parser.add_argument("--output", default=None, help="Checkpoint output path. Defaults to checkpoints/chat_finetuned.pt.")
     parser.add_argument("--no-mask-prompt", action="store_true", help="Train on prompt tokens too instead of masking them with -100.")
+    parser.add_argument(
+        "--attention-backend",
+        choices=("manual", "sdpa", "auto"),
+        default=None,
+        help="Attention implementation. Default: config value (manual when omitted).",
+    )
     args = parser.parse_args()
-    finetune(args.config, args.checkpoint, args.examples, args.iters, args.output, mask_prompt=not args.no_mask_prompt)
+    finetune(
+        args.config,
+        args.checkpoint,
+        args.examples,
+        args.iters,
+        args.output,
+        mask_prompt=not args.no_mask_prompt,
+        attention_backend=args.attention_backend,
+    )
 
 
 if __name__ == "__main__":

@@ -25,7 +25,7 @@ from .checkpoint import (
 )
 from .config import align_config_to_tokenizer, config_from_checkpoint, load_config
 from .dataset import load_processed
-from .model import GPT
+from .model import GPT, resolve_attention_backend
 from .provenance import build_checkpoint_provenance, build_pretraining_data_manifest
 from .tokenizer import ByteSeedTokenizer
 from .utils import ensure_dir, set_seed
@@ -175,8 +175,13 @@ def train(
     max_iters: int | None = None,
     resume_checkpoint: str | None = None,
     allow_inexact_resume: bool = False,
+    attention_backend: str | None = None,
 ) -> Path:
-    cfg = load_config(config_path, {"max_iters": max_iters})
+    cfg = load_config(
+        config_path,
+        {"max_iters": max_iters, "attention_backend": attention_backend},
+    )
+    cfg.attention_backend = resolve_attention_backend(cfg.attention_backend)
     if allow_inexact_resume and resume_checkpoint is None:
         raise ValueError(
             "--allow-inexact-resume requires --resume-checkpoint with an explicit path."
@@ -224,6 +229,7 @@ def train(
             cfg.tokenizer_dir = requested_cfg.tokenizer_dir
             cfg.processed_data_dir = requested_cfg.processed_data_dir
             cfg.train_split = requested_cfg.train_split
+            cfg.attention_backend = requested_cfg.attention_backend
             if max_iters is not None:
                 cfg.max_iters = int(max_iters)
             # iter is the last optimizer step whose evaluation/control updates are complete.
@@ -236,10 +242,25 @@ def train(
                     device_type=requested_device,
                     amp_enabled=requested_device == "cuda",
                 )
-                validate_training_config(
-                    exact_resume_state["training_config"],
-                    requested_critical,
-                )
+                saved_training = exact_resume_state["training_config"]
+                saved_backend = saved_training.get("attention_backend", "manual")
+                if (
+                    allow_inexact_resume
+                    and resume_checkpoint is not None
+                    and saved_backend != requested_critical["attention_backend"]
+                ):
+                    backend_matched = dict(requested_critical)
+                    backend_matched["attention_backend"] = saved_backend
+                    validate_training_config(saved_training, backend_matched)
+                    print(
+                        "WARNING: inexact pretraining resume explicitly enabled; "
+                        "attention_backend changed from "
+                        f"{saved_backend!r} to {requested_critical['attention_backend']!r}, "
+                        "so continuation is not exact."
+                    )
+                    exact_resume_state = None
+                else:
+                    validate_training_config(saved_training, requested_critical)
             print(f"Resumed from {ckpt_path}; checkpoint config is being used for model shape.")
 
     device = cfg.resolved_device
@@ -352,6 +373,12 @@ def main() -> None:
         ),
     )
     parser.add_argument("--max-iters", type=int, default=None)
+    parser.add_argument(
+        "--attention-backend",
+        choices=("manual", "sdpa", "auto"),
+        default=None,
+        help="Attention implementation. Default: config value (manual when omitted).",
+    )
     args = parser.parse_args()
     train(
         args.config,
@@ -359,6 +386,7 @@ def main() -> None:
         args.max_iters,
         args.resume_checkpoint,
         args.allow_inexact_resume,
+        args.attention_backend,
     )
 
 

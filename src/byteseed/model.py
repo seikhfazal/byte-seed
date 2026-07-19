@@ -6,7 +6,32 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .config import ByteSeedConfig
+from .config import ATTENTION_BACKENDS, ByteSeedConfig
+
+
+def sdpa_is_available() -> bool:
+    """Return whether this PyTorch build exposes the SDPA functional API."""
+    return callable(getattr(F, "scaled_dot_product_attention", None))
+
+
+def resolve_attention_backend(requested: str) -> str:
+    """Resolve a configured attention backend to the implementation in use."""
+    backend = str(requested).strip().lower()
+    if backend not in ATTENTION_BACKENDS:
+        choices = ", ".join(ATTENTION_BACKENDS)
+        raise ValueError(
+            f"Unknown attention backend {requested!r}; expected one of {choices}."
+        )
+    if backend == "manual":
+        return backend
+    if sdpa_is_available():
+        return "sdpa"
+    if backend == "auto":
+        return "manual"
+    raise RuntimeError(
+        "Attention backend 'sdpa' was requested, but this PyTorch build does not "
+        "provide torch.nn.functional.scaled_dot_product_attention."
+    )
 
 
 class CausalSelfAttention(nn.Module):
@@ -18,6 +43,8 @@ class CausalSelfAttention(nn.Module):
         self.qkv = nn.Linear(config.n_embd, 3 * config.n_embd)
         self.proj = nn.Linear(config.n_embd, config.n_embd)
         self.dropout = nn.Dropout(config.dropout)
+        self.attention_dropout_p = float(config.dropout)
+        self.attention_backend = resolve_attention_backend(config.attention_backend)
         # Lower-triangular mask blocks attention to future tokens.
         mask = torch.tril(torch.ones(config.block_size, config.block_size))
         self.register_buffer("mask", mask.view(1, 1, config.block_size, config.block_size))
@@ -29,10 +56,22 @@ class CausalSelfAttention(nn.Module):
         k = k.view(batch, time, self.n_head, self.head_size).transpose(1, 2)
         v = v.view(batch, time, self.n_head, self.head_size).transpose(1, 2)
 
-        scores = (q @ k.transpose(-2, -1)) / math.sqrt(self.head_size)
-        scores = scores.masked_fill(self.mask[:, :, :time, :time] == 0, float("-inf"))
-        weights = self.dropout(F.softmax(scores, dim=-1))
-        out = weights @ v
+        if self.attention_backend == "sdpa":
+            out = F.scaled_dot_product_attention(
+                q,
+                k,
+                v,
+                dropout_p=self.attention_dropout_p if self.training else 0.0,
+                is_causal=True,
+            )
+        else:
+            scores = (q @ k.transpose(-2, -1)) / math.sqrt(self.head_size)
+            scores = scores.masked_fill(
+                self.mask[:, :, :time, :time] == 0,
+                float("-inf"),
+            )
+            weights = self.dropout(F.softmax(scores, dim=-1))
+            out = weights @ v
         out = out.transpose(1, 2).contiguous().view(batch, time, channels)
         return self.dropout(self.proj(out))
 
@@ -69,6 +108,7 @@ class Block(nn.Module):
 class GPT(nn.Module):
     def __init__(self, config: ByteSeedConfig):
         super().__init__()
+        config.attention_backend = resolve_attention_backend(config.attention_backend)
         self.config = config
         self.token_embedding = nn.Embedding(config.vocab_size, config.n_embd)
         self.position_embedding = nn.Embedding(config.block_size, config.n_embd)
@@ -78,6 +118,10 @@ class GPT(nn.Module):
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
         self.lm_head.weight = self.token_embedding.weight
         self.apply(self._init_weights)
+
+    @property
+    def attention_backend(self) -> str:
+        return self.config.attention_backend
 
     def _init_weights(self, module: nn.Module) -> None:
         if isinstance(module, nn.Linear):

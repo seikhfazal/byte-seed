@@ -17,8 +17,9 @@ from .evaluation import EvaluationValidationError, isolated_rng
 from .provenance import canonical_sha256
 
 
-BENCHMARK_REPORT_VERSION = 1
-GENERATION_BENCHMARK_VERSION = 1
+BENCHMARK_REPORT_VERSION = 2
+GENERATION_BENCHMARK_VERSION = 2
+SUPPORTED_BENCHMARK_REPORT_VERSIONS = (1, 2)
 BENCHMARK_REPORT_KIND = "generation_benchmark"
 
 
@@ -44,6 +45,7 @@ class BenchmarkConfig:
     prompt_id: str = "benchmark.default-prompt"
     prompt_digest: str = ""
     input_token_count: int = 0
+    attention_backend: str = "manual"
 
     def validate(self) -> None:
         if isinstance(self.seed, bool) or not isinstance(self.seed, int):
@@ -83,6 +85,10 @@ class BenchmarkConfig:
             )
         if self.prompt_digest and re.fullmatch(r"[0-9a-f]{64}", self.prompt_digest) is None:
             raise BenchmarkValidationError("benchmark prompt_digest must be SHA-256")
+        if self.attention_backend not in ("manual", "sdpa"):
+            raise BenchmarkValidationError(
+                "benchmark attention_backend must be manual or sdpa"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         self.validate()
@@ -103,6 +109,7 @@ class BenchmarkConfig:
             "prompt_id": self.prompt_id,
             "prompt_digest": self.prompt_digest,
             "input_token_count": self.input_token_count,
+            "attention_backend": self.attention_backend,
         }
 
 
@@ -295,7 +302,7 @@ def validate_benchmark_report(report: Mapping[str, Any]) -> None:
             "benchmark report root fields are missing or malformed"
         )
     version = report.get("version")
-    if version != BENCHMARK_REPORT_VERSION:
+    if version not in SUPPORTED_BENCHMARK_REPORT_VERSIONS:
         qualifier = (
             "future "
             if isinstance(version, int) and version > BENCHMARK_REPORT_VERSION
@@ -310,7 +317,8 @@ def validate_benchmark_report(report: Mapping[str, Any]) -> None:
         )
     if report.get("algorithm") != "sha256":
         raise BenchmarkValidationError("benchmark report algorithm must be sha256")
-    if report.get("benchmark_version") != GENERATION_BENCHMARK_VERSION:
+    expected_benchmark_version = version
+    if report.get("benchmark_version") != expected_benchmark_version:
         raise BenchmarkValidationError(
             f"unsupported generation benchmark version: "
             f"{report.get('benchmark_version')!r}"
@@ -325,6 +333,8 @@ def validate_benchmark_report(report: Mapping[str, Any]) -> None:
         "dtype", "compile", "deterministic_algorithms", "prompt_format_version",
         "prompt_id", "prompt_digest", "input_token_count",
     }
+    if version >= 2:
+        required_configuration.add("attention_backend")
     if set(configuration) != required_configuration:
         raise BenchmarkValidationError(
             "benchmark configuration is missing or malformed"
@@ -349,6 +359,7 @@ def validate_benchmark_report(report: Mapping[str, Any]) -> None:
         prompt_id=configuration["prompt_id"],
         prompt_digest=configuration["prompt_digest"],
         input_token_count=configuration["input_token_count"],
+        attention_backend=configuration.get("attention_backend", "manual"),
     )
     if not isinstance(config.compile, bool) or not isinstance(
         config.deterministic_algorithms, bool
@@ -560,6 +571,7 @@ def render_benchmark_report(report: Mapping[str, Any]) -> str:
         "ByteSeed generation benchmark",
         f"Device: {config['device']}",
         f"Dtype: {config['dtype']}",
+        f"Attention backend: {config.get('attention_backend', 'manual')}",
         f"Warm-up runs: {config['warmup_runs']} (excluded)",
         f"Measured runs: {config['measured_runs']}",
         f"Mean latency: {aggregate['mean_elapsed_seconds']:.4f} s",

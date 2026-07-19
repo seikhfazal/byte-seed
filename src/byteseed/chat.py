@@ -114,6 +114,7 @@ def print_banner(
     repetition_penalty: float,
     dtype_name: str,
     compiled: bool,
+    attention_backend: str = "manual",
 ) -> None:
     line = "=" * 60
     top_k_text = "none" if top_k is None else str(top_k)
@@ -126,6 +127,7 @@ def print_banner(
     print(f"ckpt: {checkpoint}")
     print(f"dtype: {dtype_name}")
     print(f"compile: {'on' if compiled else 'off'}")
+    print(f"attention: {attention_backend}")
     print(f"preset: {preset}")
     print(f"temp: {temperature:g} | top_k: {top_k_text} | max_new: {max_new_tokens}")
     print(f"repetition_penalty: {repetition_penalty:g}")
@@ -293,7 +295,10 @@ def generate_reply(
 
 
 def run_chat(args: argparse.Namespace) -> None:
-    cfg = load_config(args.config)
+    cfg = load_config(
+        args.config,
+        {"attention_backend": getattr(args, "attention_backend", None)},
+    )
     tokenizer = ByteSeedTokenizer(cfg.tokenizer_dir)
     checkpoint_label = resolve_checkpoint_label(args.config, args.checkpoint)
     model = load_model(cfg, args.checkpoint, tokenizer=tokenizer)
@@ -330,6 +335,7 @@ def run_chat(args: argparse.Namespace) -> None:
         args.repetition_penalty,
         dtype_name,
         compiled,
+        model.attention_backend,
     )
     while True:
         try:
@@ -392,6 +398,12 @@ def build_parser(default_config: str, default_checkpoint: str | None, default_pr
     parser.add_argument("--top-k", type=int, default=None, help="Override the selected preset top_k.")
     parser.add_argument("--dtype", choices=("auto", "fp32", "fp16"), default="auto", help="Inference dtype. auto uses fp16 on CUDA and fp32 on CPU.")
     parser.add_argument("--compile", action="store_true", help="Try torch.compile on the model forward pass. Experimental and off by default.")
+    parser.add_argument(
+        "--attention-backend",
+        choices=("manual", "sdpa", "auto"),
+        default=None,
+        help="Attention implementation. Default: config value (manual when omitted).",
+    )
     parser.add_argument("--repetition-penalty", type=float, default=1.0, help="Optional generation repetition penalty. Default preserves existing behavior.")
     parser.add_argument("--history-turns", type=int, default=0, help="Enable startup history mode and keep up to this many previous turns, capped at 2. Default is stateless.")
     parser.add_argument("--json", action="store_true", help="Experimental and unreliable JSON output mode.")

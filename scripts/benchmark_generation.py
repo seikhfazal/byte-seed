@@ -102,6 +102,12 @@ def main() -> None:
     parser.add_argument("--max-new-tokens", type=int, default=80)
     parser.add_argument("--repetition-penalty", type=float, default=1.0)
     parser.add_argument("--device", choices=("cpu", "cuda"), default=None)
+    parser.add_argument(
+        "--attention-backend",
+        choices=("manual", "sdpa", "auto"),
+        default=None,
+        help="Attention implementation. Default: config value (manual when omitted).",
+    )
     parser.add_argument("--dtype", choices=("auto", "fp32", "fp16"), default="auto")
     parser.add_argument("--compile", action="store_true", help="Try torch.compile on the model forward pass. Experimental and off by default.")
     parser.add_argument("--deterministic-algorithms", action="store_true")
@@ -109,7 +115,13 @@ def main() -> None:
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
 
-    cfg = load_config(args.config, overrides={"device": args.device})
+    cfg = load_config(
+        args.config,
+        overrides={
+            "device": args.device,
+            "attention_backend": args.attention_backend,
+        },
+    )
     tokenizer = ByteSeedTokenizer(cfg.tokenizer_dir)
     loaded = load_checkpoint(
         args.checkpoint,
@@ -143,6 +155,7 @@ def main() -> None:
             {"prompt_format_version": 1, "prompt": args.prompt}
         ),
         input_token_count=ids.shape[1],
+        attention_backend=model.attention_backend,
     )
 
     def run_once() -> int:
@@ -190,7 +203,7 @@ def main() -> None:
         artifact_sha256=sha256_file(args.checkpoint),
     )
     model_fields = (
-        "model_name", "vocab_size", "block_size", "n_layer", "n_head", "n_embd", "dropout"
+        "model_name", "vocab_size", "block_size", "n_layer", "n_head", "n_embd", "dropout", "attention_backend"
     )
     warnings = [
         "Timing measurements are environment-dependent and are not reproducible across unlike systems."

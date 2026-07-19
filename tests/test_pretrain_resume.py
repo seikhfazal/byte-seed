@@ -154,6 +154,25 @@ def test_explicit_exact_checkpoint_is_accepted(
     assert resume_state is not None
 
 
+def test_exact_checkpoint_without_backend_metadata_defaults_to_manual(
+    tmp_path, tiny_config, checkpoint_provenance
+):
+    checkpoint = _exact_checkpoint(tiny_config, 4, checkpoint_provenance)
+    checkpoint["config"].pop("attention_backend")
+    checkpoint["resume_state"]["training_config"].pop("attention_backend")
+    checkpoint_path = _save(tmp_path / "pre-sdpa-exact.pt", checkpoint)
+
+    selected, resume_state = _resolve(
+        tmp_path,
+        checkpoint_provenance=checkpoint_provenance,
+        explicit_path=checkpoint_path,
+        allow_inexact_resume=False,
+    )
+
+    assert selected is not None
+    assert resume_state is not None
+
+
 def test_partial_explicit_resume_without_opt_in_fails(
     tmp_path, tiny_config, checkpoint_provenance
 ):

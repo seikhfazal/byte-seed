@@ -8,6 +8,9 @@ import torch
 import yaml
 
 
+ATTENTION_BACKENDS = ("manual", "sdpa", "auto")
+
+
 INT_FIELDS = {
     "vocab_size",
     "block_size",
@@ -57,6 +60,7 @@ class ByteSeedConfig:
     seed: int = 1337
     device: str = "auto"
     early_stopping_patience: int = 0
+    attention_backend: str = "manual"
 
     def __post_init__(self) -> None:
         for field in INT_FIELDS:
@@ -69,6 +73,7 @@ class ByteSeedConfig:
         self.tokenizer_dir = str(self.tokenizer_dir)
         self.checkpoint_dir = str(self.checkpoint_dir)
         self.device = str(self.device)
+        self.attention_backend = str(self.attention_backend).strip().lower()
         self.validate()
 
     @property
@@ -94,6 +99,12 @@ class ByteSeedConfig:
             raise ValueError("Config error: batch_size must be positive.")
         if self.gradient_accumulation_steps <= 0:
             raise ValueError("Config error: gradient_accumulation_steps must be positive.")
+        if self.attention_backend not in ATTENTION_BACKENDS:
+            choices = ", ".join(ATTENTION_BACKENDS)
+            raise ValueError(
+                f"Config error: attention_backend must be one of {choices}; "
+                f"got {self.attention_backend!r}."
+            )
 
 
 def _to_int(field: str, value: Any) -> int:

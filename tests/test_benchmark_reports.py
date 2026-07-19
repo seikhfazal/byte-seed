@@ -12,6 +12,7 @@ from byteseed.benchmarking import (
     build_benchmark_report,
     load_benchmark_report,
     measure_generation,
+    render_benchmark_report,
     validate_benchmark_report,
     write_benchmark_report,
 )
@@ -41,6 +42,7 @@ def _config(**overrides):
         "dtype": "fp32",
         "prompt_digest": "a" * 64,
         "input_token_count": 3,
+        "attention_backend": "manual",
     }
     values.update(overrides)
     return BenchmarkConfig(**values)
@@ -96,9 +98,9 @@ def test_tokens_per_second_and_aggregates_are_exact():
     report = _report()
     aggregate = report["measurements"]["aggregate"]
 
-    assert report["version"] == 1
+    assert report["version"] == 2
     assert report["kind"] == "generation_benchmark"
-    assert report["benchmark_version"] == 1
+    assert report["benchmark_version"] == 2
     assert aggregate["total_elapsed_seconds"] == 1.5
     assert aggregate["total_generated_tokens"] == 7
     assert aggregate["tokens_per_second"] == pytest.approx(7 / 1.5)
@@ -150,7 +152,7 @@ def test_report_digest_future_version_wrong_kind_and_tampering_fail():
     )
 
     future = dict(report)
-    future["version"] = 2
+    future["version"] = 3
     with pytest.raises(BenchmarkValidationError, match="future benchmark report version"):
         validate_benchmark_report(future)
 
@@ -172,6 +174,40 @@ def test_configuration_is_separate_from_environment_dependent_measurements():
     assert "runs" not in report["configuration"]
     assert "runs" in report["measurements"]
     assert "python_version" in report["environment"]
+
+
+def test_attention_backend_is_identity_validated_and_rendered():
+    manual = _report()
+    sdpa = build_benchmark_report(
+        _config(attention_backend="sdpa"),
+        (BenchmarkRun(1, 0.5, 4), BenchmarkRun(2, 1.0, 3)),
+        environment=ENVIRONMENT,
+    )
+
+    assert manual["configuration"]["attention_backend"] == "manual"
+    assert sdpa["configuration"]["attention_backend"] == "sdpa"
+    assert manual["digest"] != sdpa["digest"]
+    assert "Attention backend: sdpa" in render_benchmark_report(sdpa)
+
+    invalid = json.loads(json.dumps(manual))
+    invalid["configuration"]["attention_backend"] = "auto"
+    invalid["digest"] = canonical_sha256(
+        {key: value for key, value in invalid.items() if key != "digest"}
+    )
+    with pytest.raises(BenchmarkValidationError, match="attention_backend"):
+        validate_benchmark_report(invalid)
+
+
+def test_legacy_version_one_report_remains_valid_as_manual():
+    legacy = json.loads(json.dumps(_report()))
+    legacy["version"] = 1
+    legacy["benchmark_version"] = 1
+    legacy["configuration"].pop("attention_backend")
+    legacy["digest"] = canonical_sha256(
+        {key: value for key, value in legacy.items() if key != "digest"}
+    )
+
+    validate_benchmark_report(legacy)
 
 
 def test_utf8_writing_creates_parent_and_refuses_silent_overwrite(tmp_path):

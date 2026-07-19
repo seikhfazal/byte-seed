@@ -135,6 +135,7 @@ def _model_configuration(model: torch.nn.Module) -> dict[str, object]:
         "n_head",
         "n_embd",
         "dropout",
+        "attention_backend",
     )
     return {field: getattr(config, field) for field in fields}
 
@@ -164,6 +165,12 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--device", choices=["cpu", "cuda"], default=None)
     parser.add_argument(
+        "--attention-backend",
+        choices=("manual", "sdpa", "auto"),
+        default=None,
+        help="Attention implementation. Default: config value (manual when omitted).",
+    )
+    parser.add_argument(
         "--sampling-mode",
         choices=["stochastic", "greedy"],
         default="stochastic",
@@ -175,7 +182,13 @@ def main() -> None:
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
 
-    cfg = load_config(args.config, overrides={"device": args.device})
+    cfg = load_config(
+        args.config,
+        overrides={
+            "device": args.device,
+            "attention_backend": args.attention_backend,
+        },
+    )
     tokenizer = ByteSeedTokenizer(cfg.tokenizer_dir)
     checkpoint = args.checkpoint or default_checkpoint()
     loaded = load_checkpoint(

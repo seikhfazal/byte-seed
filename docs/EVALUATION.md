@@ -125,13 +125,16 @@ Generation benchmarks are separate from evaluation scores. The benchmark script 
 ```powershell
 python scripts/benchmark_generation.py `
   --checkpoint checkpoints\anchor_v2_3_finetuned.pt `
+  --attention-backend manual `
   --seed 1337 `
   --warmup-runs 2 `
   --runs 10 `
-  --output-json runs\benchmarks\generation-v1.json
+  --output-json runs\benchmarks\generation-v2.json
 ```
 
-Benchmark report version 1 records the benchmark version; seed; path-safe checkpoint, model, and tokenizer identities; device, dtype, and actual compile status; warm-up and measured-run counts; prompt digest and input-token count; generation settings; ordered per-run elapsed time, generated tokens, and throughput; aggregate latency and tokens per second; valid peak CUDA memory when applicable; warnings; and a canonical digest.
+Benchmark report version 2 records the resolved `manual` or `sdpa` attention backend in the canonical configuration identity in addition to the version-1 fields: benchmark version; seed; path-safe checkpoint, model, and tokenizer identities; device, dtype, and actual compile status; warm-up and measured-run counts; prompt digest and input-token count; generation settings; ordered per-run elapsed time, generated tokens, and throughput; aggregate latency and tokens per second; valid peak CUDA memory when applicable; warnings; and a canonical digest. The report loader continues to validate version-1 reports and interprets their absent backend as `manual`.
+
+Manual attention is the default. `--attention-backend sdpa` requests PyTorch SDPA and fails if the API is unavailable; `auto` uses SDPA when available and otherwise resolves to manual. Availability and performance depend on the PyTorch build, device, dtype, shape, and internal kernel selection. Reports identify the resolved backend without claiming a particular kernel or universal speedup. Checkpoint weights remain compatible between backends, while exact training resume requires the same backend.
 
 CPU reports use `null` for peak CUDA memory. CUDA reports require a valid measured value. Warm-up results never enter measured aggregates. Timing values and report digests that contain them are environment-dependent; they are not reproducible performance claims across unlike machines. ByteSeed does not compare these measurements with external models or claim benchmark superiority.
 
