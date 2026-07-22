@@ -1105,6 +1105,8 @@ def torch_batch_generator(model: Any, tokenizer: Any) -> EvaluationBatchGenerato
         outputs: list[GeneratedCaseOutput] = []
         stop_ids = set(config.stop_token_ids) if config.stop_at_end else None
         eos_id = getattr(tokenizer, "eos_id", None)
+        if stop_ids is not None and eos_id is not None:
+            stop_ids.add(int(eos_id))
         device = torch.device(config.device)
         for case in cases:
             prompt_ids = tokenizer.encode(
@@ -1124,7 +1126,6 @@ def torch_batch_generator(model: Any, tokenizer: Any) -> EvaluationBatchGenerato
                     top_k=config.top_k,
                     repetition_penalty=config.repetition_penalty,
                     vocab_limit=getattr(tokenizer, "vocab_size", None),
-                    eos_token_id=eos_id if config.stop_at_end else None,
                     stop_token_ids=stop_ids,
                 )
             new_ids = generated[0, len(prompt_ids) :].tolist()

@@ -5,6 +5,7 @@ import random
 import pytest
 import torch
 
+from byteseed.config import ByteSeedConfig
 from byteseed.eval_prompts import (
     ANCHOR_RETENTION_DEFINITION,
     CANDIDATE_PARAPHRASE_DEFINITION,
@@ -15,6 +16,7 @@ from byteseed.evaluation import (
     run_evaluation,
     torch_batch_generator,
 )
+from byteseed.model import GPT
 
 
 ENVIRONMENT = {
@@ -212,3 +214,56 @@ def test_torch_adapter_uses_model_and_tokenizer_doubles_without_artifacts():
     assert output.response == "answer"
     assert output.generated_token_count == 2
     assert output.stop_reason == "stop_token"
+
+
+@pytest.mark.parametrize(
+    "suite",
+    (ANCHOR_RETENTION_DEFINITION, CANDIDATE_PARAPHRASE_DEFINITION),
+)
+def test_torch_adapter_uses_real_gpt_generate_and_stops_on_tokenizer_eos(suite):
+    class TokenizerDouble:
+        eos_id = 2
+        vocab_size = 8
+
+        def encode(self, text, *, add_bos=False, add_eos=False):
+            assert text.startswith("<|user|>")
+            assert add_bos is True and add_eos is False
+            return [1, 3]
+
+        def decode(self, token_ids):
+            assert token_ids == [self.eos_id]
+            return "</s>"
+
+    config = ByteSeedConfig(
+        model_name="ByteSeed-Evaluation-Integration",
+        vocab_size=8,
+        block_size=8,
+        n_layer=1,
+        n_head=1,
+        n_embd=4,
+        dropout=0.0,
+        device="cpu",
+    )
+    model = GPT(config).eval()
+    with torch.no_grad():
+        for parameter in model.parameters():
+            parameter.zero_()
+        model.ln_f.weight.fill_(1.0)
+        position_signal = torch.tensor([1.0, -1.0, 0.0, 0.0])
+        model.position_embedding.weight.copy_(position_signal.repeat(config.block_size, 1))
+        model.token_embedding.weight[TokenizerDouble.eos_id].copy_(position_signal)
+
+    outputs = torch_batch_generator(model, TokenizerDouble())(
+        suite.cases[:2],
+        GenerationConfig(
+            seed=17,
+            top_k=1,
+            max_new_tokens=4,
+            stop_token_ids=(),
+            stop_at_end=True,
+        ),
+    )
+
+    assert len(outputs) == 2
+    assert all(output.generated_token_count == 1 for output in outputs)
+    assert all(output.stop_reason == "stop_token" for output in outputs)
