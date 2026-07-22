@@ -116,6 +116,29 @@ Fixed-seed stochastic output is reproducible only within the same supported soft
 
 Use `python scripts/eval_stable_v0_2.py --help` for evaluation/report options and `python scripts/benchmark_generation.py --help` for benchmark-report options. See [EVALUATION.md](EVALUATION.md) for suite semantics, contamination classifications, report schemas, and complete commands.
 
+## Generalization SFT v1 data-only preparation
+
+generalization-sft-v1 adds 768 deterministic examples across 12 balanced
+concept families. It is intended to be combined with, not replace, the tracked
+400-record curated personal-assistant core in a future explicitly authorized
+SFT run. This PR does not train a model.
+
+The builder writes current-format SFT JSONL plus linked version-1 SFT manifest
+and quality report files under the ignored generated-data directory by default.
+Stable groups represent authored lesson/template clusters, not entire concept
+families. The 93 groups keep related prompt forms together while the canonical
+document-aware split assigns 648 records to training and 120 to validation,
+places all 12 families on both sides, and has zero group leakage. The quality
+report classifies every internal near finding; sharing a group does not by
+itself excuse prohibited wording. The audit also covers exact and near wording
+against anchor-retention-v0.2,
+candidate-paraphrase-v1, and generalization-holdout-v1.
+
+The new 24-case holdout is excluded from training and begins unverified.
+Registration and a clean data build do not measure quality. A future checkpoint
+must link exact tokenizer and combined-data provenance before held-out wording
+is permitted. See [Generalization SFT v1](GENERALIZATION_SFT_V1.md).
+
 ## Current Stable Checkpoint
 
 `checkpoints/anchor_v2_3_finetuned.pt` is the current stable checkpoint.

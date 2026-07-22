@@ -86,3 +86,35 @@ It omits timestamps, absolute paths, and document bodies. Equivalent inputs in d
 Document-aware builds use data-manifest version `2`. The manifest continues to fingerprint `train.npy`, `val.npy`, and tokenizer identity, and additionally includes the report digest plus document, normalization, deduplication, split, seed, ratio, and contamination policy. Changing any of those identity fields changes the manifest digest.
 
 Manifest version `1` remains valid under its original contiguous-token semantics. It is never reinterpreted as document-aware. Exact resume compares the originally stored manifest version and digest; a v2 runtime also requires the persisted quality report to match its manifest. Inference and legacy Anchor checkpoint compatibility are unchanged.
+
+## Generalization SFT data
+
+generalization-sft-v1 uses a focused SFT manifest and quality-report schema,
+both version 1, without changing the pretraining manifest contracts above. The
+SFT report reuses the registered exact-contamination detector and adds
+near-wording policy version 1 at a fixed 0.82 threshold. The comparison
+case-folds and tokenizes the existing normalized document text, then considers
+sequence order, token overlap, multiset overlap, and contained prompt wording.
+
+The SFT audit fails when any registered suite has an exact or near finding.
+It records all three suite versions, ordered IDs, and canonical suite digests,
+plus internal and curated-core overlap findings. A report without its versioned
+manifest is orphaned and invalid; a manifest without its report, a link digest
+mismatch, or an output JSONL digest mismatch also fails closed.
+
+Its split-readiness section assigns stable source-template/semantic clusters,
+then routes those groups through the existing document-aware splitter. The
+report records partition and per-family counts, group-size distribution, split
+membership, leakage status, and a canonical split-preview digest. Validation
+requires every required family in both train and validation and rejects any
+group shared across partitions.
+
+Every internal near finding is retained even when records share a group. The
+review section records both record IDs, concept families, group IDs, similarity,
+and one of three classifications: expected same-cluster variant, legitimate
+cross-topic wording, or rewrite required. A build fails while any finding still
+requires rewrite; same-group membership alone is not an exception.
+
+Concept overlap is expected and allowed. Exact or cosmetically rewritten
+evaluation wording is not. See [Generalization SFT v1](GENERALIZATION_SFT_V1.md)
+for the source, builder, grouping, and future-training policy.

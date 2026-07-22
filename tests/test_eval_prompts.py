@@ -14,13 +14,23 @@ from byteseed.eval_prompts import (
     CANDIDATE_PARAPHRASE_SUITE,
     CANDIDATE_PARAPHRASE_SUITE_VERSION,
     EvaluationSuite,
+    GENERALIZATION_HOLDOUT_DEFINITION,
+    GENERALIZATION_HOLDOUT_PROMPTS,
+    GENERALIZATION_HOLDOUT_SUITE,
+    GENERALIZATION_HOLDOUT_SUITE_VERSION,
     registered_evaluation_prompts,
     serialize_evaluation_suite,
     validate_evaluation_suite,
 )
-from byteseed.evaluation import normalize_rubric_text, score_response
+from byteseed.evaluation import (
+    GeneratedCaseOutput,
+    GenerationConfig,
+    normalize_rubric_text,
+    run_evaluation,
+    score_response,
+)
 from byteseed.provenance import canonical_sha256
-from scripts.eval_stable_v0_2 import check_answer
+from scripts.eval_stable_v0_2 import check_answer, main as evaluation_main
 
 
 ANCHOR_TEXT = [
@@ -78,7 +88,9 @@ def test_candidate_has_one_case_per_anchor_concept_and_transparent_rubrics():
 
 def test_registry_order_and_suite_serialization_are_deterministic():
     assert registered_evaluation_prompts() == (
-        ANCHOR_RETENTION_PROMPTS + CANDIDATE_PARAPHRASE_PROMPTS
+        ANCHOR_RETENTION_PROMPTS
+        + CANDIDATE_PARAPHRASE_PROMPTS
+        + GENERALIZATION_HOLDOUT_PROMPTS
     )
     first = serialize_evaluation_suite(CANDIDATE_PARAPHRASE_DEFINITION)
     second = copy.deepcopy(first)
@@ -87,6 +99,131 @@ def test_registry_order_and_suite_serialization_are_deterministic():
     assert [case["prompt_id"] for case in first["cases"]] == [
         case.prompt_id for case in CANDIDATE_PARAPHRASE_PROMPTS
     ]
+
+
+def test_existing_suite_payloads_are_frozen_by_canonical_digest():
+    assert canonical_sha256(serialize_evaluation_suite(ANCHOR_RETENTION_DEFINITION)) == (
+        "87aaf506deb5c4085403314cdc87e3548eb5038210b6957170b2356a8af59ff3"
+    )
+    assert canonical_sha256(serialize_evaluation_suite(CANDIDATE_PARAPHRASE_DEFINITION)) == (
+        "8e00b0f4f53603bd57f7f734f5a8fb95fc43f1201112a2181398cca60f2e5b20"
+    )
+    assert [case.prompt_id for case in ANCHOR_RETENTION_PROMPTS] == [
+        "anchor.identity",
+        "anchor.stack",
+        "anchor.queue",
+        "anchor.overfitting",
+        "anchor.underfitting",
+        "anchor.dsa-plan",
+        "anchor.chat-command",
+        "anchor.cuda-false",
+        "anchor.checkpoint-hygiene",
+    ]
+    assert [case.prompt_id for case in CANDIDATE_PARAPHRASE_PROMPTS] == [
+        "candidate.identity-introduction",
+        "candidate.stack-ordering",
+        "candidate.queue-ordering",
+        "candidate.overfitting-generalization",
+        "candidate.underfitting-capacity",
+        "candidate.dsa-schedule",
+        "candidate.local-chat-launch",
+        "candidate.cuda-detection",
+        "candidate.checkpoint-git-policy",
+    ]
+
+
+def test_generalization_holdout_is_versioned_balanced_and_unverified():
+    assert GENERALIZATION_HOLDOUT_SUITE == "generalization-holdout-v1"
+    assert GENERALIZATION_HOLDOUT_SUITE_VERSION == 1
+    assert GENERALIZATION_HOLDOUT_DEFINITION.purpose == "candidate-generalization"
+    assert GENERALIZATION_HOLDOUT_DEFINITION.historical_status == "candidate-unverified"
+    assert len(GENERALIZATION_HOLDOUT_PROMPTS) == 24
+    assert len({case.prompt_id for case in GENERALIZATION_HOLDOUT_PROMPTS}) == 24
+    concepts = {}
+    for case in GENERALIZATION_HOLDOUT_PROMPTS:
+        concepts[case.concept_id] = concepts.get(case.concept_id, 0) + 1
+        assert case.rubric is not None
+        assert case.rubric.required
+    assert concepts == {
+        "identity": 2,
+        "capabilities-limitations": 2,
+        "stack-fundamentals": 2,
+        "queue-fundamentals": 2,
+        "stack-queue-comparison": 2,
+        "overfitting": 2,
+        "underfitting": 2,
+        "fit-contrast": 2,
+        "dsa-study-planning": 2,
+        "local-workflow": 2,
+        "cuda-troubleshooting": 2,
+        "checkpoint-git-hygiene": 2,
+    }
+    assert {
+        normalize_rubric_text(case.text) for case in GENERALIZATION_HOLDOUT_PROMPTS
+    }.isdisjoint(
+        {
+            normalize_rubric_text(case.text)
+            for case in ANCHOR_RETENTION_PROMPTS + CANDIDATE_PARAPHRASE_PROMPTS
+        }
+    )
+
+
+def test_generalization_holdout_report_is_deterministic_and_not_claimed_held_out():
+    def generator(cases, _config):
+        return [
+            GeneratedCaseOutput("unscored synthetic answer", 3, "max_new_tokens")
+            for _ in cases
+        ]
+
+    environment = {
+        "python_version": "test",
+        "pytorch_version": "test",
+        "device": "cpu",
+        "dtype": "fp32",
+        "compile": False,
+        "deterministic_algorithms_enabled": False,
+    }
+    first = run_evaluation(
+        GENERALIZATION_HOLDOUT_DEFINITION,
+        GenerationConfig(seed=19),
+        generator,
+        environment=environment,
+    )
+    second = run_evaluation(
+        GENERALIZATION_HOLDOUT_DEFINITION,
+        GenerationConfig(seed=19),
+        generator,
+        environment=environment,
+    )
+    assert first["digest"] == second["digest"]
+    assert first["summary"]["total_cases"] == 24
+    assert first["summary"]["metric_label"] == "Generalization holdout candidate checks"
+    assert first["summary"]["held_out_generalization_measured"] is False
+    assert first["contamination"]["held_out_status"] == "unverified"
+
+
+def test_holdout_fit_contradiction_rubrics_reject_concept_blending():
+    underfit = next(
+        case
+        for case in GENERALIZATION_HOLDOUT_PROMPTS
+        if case.prompt_id == "generalization.underfitting.both-splits"
+    )
+    assert score_response(
+        underfit,
+        "This is underfitting because training and validation are both weak.",
+    )["status"] == "pass"
+    assert score_response(
+        underfit,
+        "This is overfitting even though training and validation are both weak.",
+    )["status"] == "fail"
+
+
+def test_stable_evaluation_cli_lists_the_new_suite(monkeypatch, capsys):
+    monkeypatch.setattr("sys.argv", ["eval_stable_v0_2.py", "--help"])
+    with pytest.raises(SystemExit) as error:
+        evaluation_main()
+    assert error.value.code == 0
+    assert "generalization-holdout-v1" in capsys.readouterr().out
 
 
 def test_duplicate_prompt_ids_fail_clearly():

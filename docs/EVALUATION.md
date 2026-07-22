@@ -5,6 +5,7 @@ ByteSeed evaluation is separate from training. Evaluation scripts load an existi
 The current published result remains:
 
 - Anchor-retention regression: 9/9.
+- Candidate paraphrase checks: 2/9 (unverified).
 - Held-out generalization: not yet measured.
 
 The Anchor result is a historical retention regression with known training overlap. It is not a held-out metric, evidence of generalization, or a broad benchmark score.
@@ -15,12 +16,22 @@ The Anchor result is a historical retention regression with known training overl
 | --- | ---: | --- | --- | ---: |
 | `anchor-retention-v0.2` | 1 | Historical retention regression | Known contaminated | 9 |
 | `candidate-paraphrase-v1` | 1 | Candidate generalization checks | Candidate/unverified | 9 |
+| `generalization-holdout-v1` | 1 | Generalization holdout candidate checks | Candidate/unverified | 24 |
 
 The Anchor prompt text, IDs, and ordering remain unchanged. All nine prompts occur verbatim in historical Anchor v2.3 SFT material, so an Anchor report is always classified as contaminated and retention-only.
 
 The candidate suite has one materially reworded case for each Anchor concept. Stable IDs are independent of list position. Candidate wording is not itself evidence of held-out status: the suite starts unverified and becomes verified clean only for a specific audited data identity.
 
-Both suites are part of the shared evaluation-prompt registry. New data-quality reports record registry version, suite version, and the exact ordered prompt IDs that were audited. Older data-quality report-v1 files remain valid, but a report that does not record exact suite coverage cannot verify a candidate suite as clean.
+The generalization holdout adds two untouched cases for each of the 12 v0.5
+concept families. Its rubrics check concepts and declared contradictions rather
+than full response strings. It starts candidate/unverified and is not evaluated
+as part of this data-only PR.
+
+All three suites are part of the shared evaluation-prompt registry. New
+generalization SFT quality reports record registry version, suite version,
+canonical suite digest, and the exact ordered prompt IDs audited. The training
+source is independent of suite text; the registry is consulted only after
+construction for contamination auditing.
 
 ## Deterministic rubrics
 
@@ -144,7 +155,12 @@ KV caching is inference-only and off by default. It supports both attention impl
 
 ## Current claims
 
-Infrastructure for deterministic candidate evaluation now exists, but no verified candidate-suite score is published here. Until an actual run has exact clean audit and checkpoint provenance, the honest project-level statement remains:
+Infrastructure for deterministic candidate evaluation now exists. The current
+candidate-paraphrase-v1 result is 2/9 with unverified held-out status. No
+generalization-holdout-v1 model run is performed or claimed by the data-only
+milestone. Until a future run has exact clean audit and checkpoint provenance,
+the honest project-level statement remains:
 
 - Anchor-retention regression: 9/9.
+- Candidate paraphrase checks: 2/9 (unverified).
 - Held-out generalization: not yet measured.

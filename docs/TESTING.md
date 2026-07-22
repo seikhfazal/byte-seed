@@ -43,6 +43,21 @@ PR 8 adds deterministic CPU coverage for the default manual backend, explicit `m
 
 PR 9 adds CPU-only coverage for inference cache structure and validation, absolute-position offsets, manual and SDPA prefill/incremental logits, multi-step cache growth, batch generation, stop tokens, sampling settings, and controlled greedy equivalence at strict FP32 tolerances. Rollover fixtures prove that cache reuse stops when learned-position context cropping begins and that output remains equal to the uncached reference path. Tests also prove request isolation, unchanged parameters/state-dict/checkpoint schema, cache-off CLI defaults, compile/cache rejection, benchmark report v3 identity, and continued version-1/version-2 report validation as uncached. No timing result or speedup is asserted.
 
+The v0.5 generalization-data tests freeze the canonical identities of both
+pre-existing evaluation suites, validate the new 24-case holdout, load all 768
+generated examples through the current SFT loader, and require usable assistant
+supervision. Temporary builds prove byte determinism, overwrite protection,
+manifest/report linkage, source independence from evaluation text,
+source-template/semantic-cluster grouping, exact and near suite cleanliness,
+and zero overlap with the tracked curated core. The canonical split preview is
+routed through the existing document-aware splitter and proves all 12 families
+occur in both partitions with no group leakage. Repeated builds must reproduce
+group IDs and split membership. Every internal near finding receives a
+machine-readable classification and rationale; putting two records in one group
+does not automatically excuse prohibited wording. Adversarial fixtures cover
+punctuation, capitalization, whitespace, singular/plural cosmetics, reordered
+wording, short affixes, and embedded prompt copies.
+
 The suite currently has no known strict expected failures.
 
 Later defect-fix PRs must remove the relevant `xfail` marker, retain the focused assertion, and add any boundary coverage needed for the corrected behavior. Do not silently turn a known defect into a passing compatibility expectation.

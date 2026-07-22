@@ -52,6 +52,8 @@ ANCHOR_RETENTION_SUITE = "anchor-retention-v0.2"
 ANCHOR_RETENTION_SUITE_VERSION = 1
 CANDIDATE_PARAPHRASE_SUITE = "candidate-paraphrase-v1"
 CANDIDATE_PARAPHRASE_SUITE_VERSION = 1
+GENERALIZATION_HOLDOUT_SUITE = "generalization-holdout-v1"
+GENERALIZATION_HOLDOUT_SUITE_VERSION = 1
 
 
 def _requirement(concept: str, *phrases: str) -> RubricRequirement:
@@ -233,6 +235,245 @@ CANDIDATE_PARAPHRASE_PROMPTS: tuple[EvaluationPrompt, ...] = (
 )
 
 
+GENERALIZATION_HOLDOUT_PROMPTS: tuple[EvaluationPrompt, ...] = (
+    EvaluationPrompt(
+        "generalization.identity.local-model",
+        "A user mistakes this project for a hosted service. In one sentence, what is ByteSeed?",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "identity",
+        _rubric(
+            _requirement("ByteSeed identity", "byteseed"),
+            _requirement("small local model", "small", "tiny", "local"),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.identity.learning-role",
+        "Describe ByteSeed's intended role without presenting it as production software.",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "identity",
+        _rubric(
+            _requirement("ByteSeed identity", "byteseed"),
+            _requirement("learning or experimentation", "learning", "experiment"),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.capabilities.modest-tasks",
+        "Give two modest kinds of technical help this small project is designed to demonstrate.",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "capabilities-limitations",
+        _rubric(
+            _requirement("technical learning task", "dsa", "data structure", "study"),
+            _requirement("local project help", "byteseed", "pytorch", "cuda", "local"),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.capabilities.boundary",
+        "What important limit should accompany a truthful summary of ByteSeed's capabilities?",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "capabilities-limitations",
+        _rubric(
+            _requirement(
+                "limited experimental scope", "small", "limited", "experimental",
+                "not production", "cannot",
+            ),
+            forbidden_terms=("guaranteed correctness", "production ready"),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.stack.plate-removal",
+        "Four plates are placed down in order A, B, C, then D. Using stack behavior, which leaves first?",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "stack-fundamentals",
+        _rubric(
+            _requirement("D leaves first", "plate d", "item d", "d leaves", "d is first"),
+            _requirement("last-in-first-out ordering", "lifo", "last in", "most recent", "top"),
+            forbidden_terms=("fifo",),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.stack.undo-history",
+        "Why is a stack a natural structure for an editor's undo history?",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "stack-fundamentals",
+        _rubric(
+            _requirement("most recent action first", "most recent", "latest", "last action"),
+            _requirement("stack operation or order", "pop", "lifo", "last in"),
+            forbidden_terms=("fifo",),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.queue.printer-order",
+        "Print jobs R, S, and T arrive in that order. Which job should a normal queue process first, and why?",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "queue-fundamentals",
+        _rubric(
+            _requirement("R leaves first", "job r", "request r", "r leaves", "r is first"),
+            _requirement("first-in-first-out ordering", "fifo", "first in", "arrived first"),
+            forbidden_terms=("lifo",),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.queue.service-line",
+        "Explain why a fair first-come service line is modeled with a queue.",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "queue-fundamentals",
+        _rubric(
+            _requirement("arrival order", "first come", "arrived first", "oldest"),
+            _requirement("queue ordering", "fifo", "first in"),
+            forbidden_terms=("lifo",),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.stack-queue.undo-print",
+        "Choose structures for editor undo actions and printer jobs, and state the ordering rule for each.",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "stack-queue-comparison",
+        _rubric(
+            _requirement("undo uses stack", "undo", "stack"),
+            _requirement("printer uses queue", "printer", "queue"),
+            _requirement("both ordering rules", "lifo", "last in"),
+            _requirement("queue ordering", "fifo", "first in"),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.stack-queue.next-item",
+        "How does choosing the next item differ between a stack and a queue?",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "stack-queue-comparison",
+        _rubric(
+            _requirement("stack takes newest", "stack", "lifo", "newest", "last"),
+            _requirement("queue takes oldest", "queue", "fifo", "oldest", "first"),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.overfitting.loss-curves",
+        "Training loss keeps falling while validation loss rises. Name the likely problem and explain the signal.",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "overfitting",
+        _rubric(
+            _requirement("overfitting", "overfit"),
+            _requirement("training improves", "training loss", "train"),
+            _requirement("validation worsens", "validation loss", "validation"),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.overfitting.memorized-drills",
+        "A learner reproduces practice answers exactly but fails new versions of the problems. What ML failure does this resemble?",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "overfitting",
+        _rubric(
+            _requirement("overfitting", "overfit"),
+            _requirement("memorization", "memoriz"),
+            _requirement("weak generalization", "new", "unseen", "generaliz"),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.underfitting.both-splits",
+        "A model has large errors on both its training set and validation set. Which fit problem is most likely?",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "underfitting",
+        _rubric(
+            _requirement("underfitting", "underfit"),
+            _requirement("both splits are weak", "training", "train"),
+            _requirement("validation is weak", "validation"),
+            forbidden_terms=("overfitting",),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.underfitting.insufficient-model",
+        "What happens when a model is too simple to capture even the main pattern in its examples?",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "underfitting",
+        _rubric(
+            _requirement("underfitting", "underfit"),
+            _requirement("insufficient fit", "too simple", "capacity", "cannot capture"),
+            forbidden_terms=("memorization",),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.fit-contrast.two-models",
+        "Model A is strong on training data but weak on validation; Model B is weak on both. Classify each.",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "fit-contrast",
+        _rubric(
+            _requirement("A overfits", "model a overfits", "a is overfitting", "a overfits"),
+            _requirement("B underfits", "model b underfits", "b is underfitting", "b underfits"),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.fit-contrast.diagnostic",
+        "Use training and validation behavior to distinguish overfitting from underfitting.",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "fit-contrast",
+        _rubric(
+            _requirement("overfit split gap", "overfit", "training", "validation"),
+            _requirement("underfit both weak", "underfit", "both", "training and validation"),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.dsa-plan.forty-five-minutes",
+        "Design a focused 45-minute session for a weak data-structure topic.",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "dsa-study-planning",
+        _rubric(
+            _requirement("time allocation", "minute", "minutes"),
+            _requirement("practice", "practice", "solve", "problem"),
+            _requirement("review", "review", "mistake", "recap"),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.dsa-plan.twenty-five-minutes",
+        "Only 25 minutes remain before a study break. Give a realistic DSA practice plan.",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "dsa-study-planning",
+        _rubric(
+            _requirement("time allocation", "minute", "minutes"),
+            _requirement("practice", "practice", "solve", "problem"),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.local-workflow.venv-ready",
+        "The repository is cloned and the virtual environment is active. What command opens its terminal interface?",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "local-workflow",
+        _rubric(
+            _requirement("chat launch command", "python chat.py"),
+            forbidden_terms=("chat.py.py",),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.local-workflow.wrong-directory",
+        "A PowerShell session is outside the project folder. Give the two basic steps needed to start ByteSeed locally.",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "local-workflow",
+        _rubric(
+            _requirement("enter repository", "cd", "set-location"),
+            _requirement("chat launch command", "python chat.py"),
+            forbidden_terms=("chat.py.py",),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.cuda.runtime-mismatch",
+        "nvidia-smi works, but torch.cuda.is_available() is false. Name two targeted checks.",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "cuda-troubleshooting",
+        _rubric(
+            _requirement("PyTorch CUDA build", "torch.version.cuda", "cuda build", "pytorch build"),
+            _requirement("active environment", "environment", "venv", "interpreter"),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.cuda.cpu-build",
+        "PyTorch reports that it was compiled without CUDA support. What is the practical next step?",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "cuda-troubleshooting",
+        _rubric(
+            _requirement("install CUDA-enabled PyTorch", "cuda-enabled", "cuda build", "reinstall"),
+            _requirement("matching environment or platform", "environment", "pytorch", "driver", "system"),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.checkpoint.large-file",
+        "A 600 MB .pt file appears in git status after training. What should happen before the next commit?",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "checkpoint-git-hygiene",
+        _rubric(
+            _requirement("exclude checkpoint", "do not commit", "remove", "keep it out"),
+            _requirement("ignore rule", ".gitignore", "gitignore"),
+        ),
+    ),
+    EvaluationPrompt(
+        "generalization.checkpoint.distribution",
+        "How can trained weights be shared without placing generated binaries in ordinary source history?",
+        GENERALIZATION_HOLDOUT_SUITE, "candidate-unverified", "checkpoint-git-hygiene",
+        _rubric(
+            _requirement(
+                "external artifact storage", "release asset", "model registry",
+                "object storage", "artifact storage",
+            ),
+            _requirement("source history distinction", "git", "repository", "source"),
+        ),
+    ),
+)
+
+
 ANCHOR_RETENTION_DEFINITION = EvaluationSuite(
     ANCHOR_RETENTION_SUITE,
     ANCHOR_RETENTION_SUITE_VERSION,
@@ -248,6 +489,14 @@ CANDIDATE_PARAPHRASE_DEFINITION = EvaluationSuite(
     "deterministic-rubric",
     "candidate-unverified",
     CANDIDATE_PARAPHRASE_PROMPTS,
+)
+GENERALIZATION_HOLDOUT_DEFINITION = EvaluationSuite(
+    GENERALIZATION_HOLDOUT_SUITE,
+    GENERALIZATION_HOLDOUT_SUITE_VERSION,
+    "candidate-generalization",
+    "deterministic-rubric",
+    "candidate-unverified",
+    GENERALIZATION_HOLDOUT_PROMPTS,
 )
 
 
@@ -274,7 +523,11 @@ def validate_evaluation_suite(suite: EvaluationSuite) -> None:
 
 
 def registered_evaluation_suites() -> tuple[EvaluationSuite, ...]:
-    suites = (ANCHOR_RETENTION_DEFINITION, CANDIDATE_PARAPHRASE_DEFINITION)
+    suites = (
+        ANCHOR_RETENTION_DEFINITION,
+        CANDIDATE_PARAPHRASE_DEFINITION,
+        GENERALIZATION_HOLDOUT_DEFINITION,
+    )
     for suite in suites:
         validate_evaluation_suite(suite)
     return suites

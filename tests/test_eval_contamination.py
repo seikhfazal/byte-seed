@@ -18,6 +18,7 @@ from byteseed.eval_prompts import (
     ANCHOR_RETENTION_PROMPTS,
     CANDIDATE_PARAPHRASE_PROMPTS,
     EvaluationPrompt,
+    GENERALIZATION_HOLDOUT_PROMPTS,
     registered_evaluation_prompts,
 )
 
@@ -163,7 +164,11 @@ def test_anchor_prompt_registry_is_unique_deterministic_and_text_stable():
 
     registry = registered_evaluation_prompts()
 
-    assert registry == ANCHOR_RETENTION_PROMPTS + CANDIDATE_PARAPHRASE_PROMPTS
+    assert registry == (
+        ANCHOR_RETENTION_PROMPTS
+        + CANDIDATE_PARAPHRASE_PROMPTS
+        + GENERALIZATION_HOLDOUT_PROMPTS
+    )
     assert [prompt.text for prompt in ANCHOR_RETENTION_PROMPTS] == expected
     assert len({prompt.prompt_id for prompt in registry}) == len(registry)
     assert all(

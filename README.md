@@ -175,7 +175,12 @@ The exact-resume guarantee is intentionally bounded. With matching supported sof
 
 New pretraining-data builds preserve document boundaries before tokenization. Canonical duplicate groups are assigned as a unit, so duplicate content cannot cross the train/validation boundary. Splitting is deterministic from the duplicate-group fingerprint, configured seed, and validation ratio.
 
-Both registered evaluation suites are checked for exact normalized overlap in document text and structured fields. New reports record the exact suite versions and ordered prompt IDs audited. Contaminated builds fail by default; the historical override is explicit and recorded in the quality report and manifest identity.
+All registered evaluation suites are checked for exact normalized overlap in
+document text and structured fields. The generalization SFT builder additionally
+checks near wording against all three suites. New reports record the exact suite
+versions and ordered prompt IDs audited. Contaminated builds fail by default;
+the historical override is explicit and recorded in the quality report and
+manifest identity.
 
 **Anchor-retention regression: 9/9.**
 
@@ -242,6 +247,7 @@ Repository audits identify the following next areas of work:
 - [Dataset guide](docs/DATASET_GUIDE.md)
 - [Data-quality and provenance policy](docs/DATA_QUALITY.md)
 - [Evaluation suites and report schemas](docs/EVALUATION.md)
+- [Generalization SFT v1 data and holdout](docs/GENERALIZATION_SFT_V1.md)
 - [Testing and CI](docs/TESTING.md)
 - [Known limitations](docs/LIMITATIONS.md)
 - [Data handling guidance](data/README_DATA.md)

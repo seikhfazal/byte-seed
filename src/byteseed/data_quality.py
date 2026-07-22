@@ -5,7 +5,8 @@ import json
 import re
 import unicodedata
 import warnings
-from collections import defaultdict
+from difflib import SequenceMatcher
+from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -33,9 +34,12 @@ SPLIT_STRATEGY_VERSION = 1
 DATA_QUALITY_REPORT_VERSION = 1
 SPLIT_STRATEGY = "canonical-group-sha256"
 DEDUPLICATION_STRATEGY = "canonical-sha256-representative"
+NEAR_DUPLICATE_VERSION = 1
+NEAR_DUPLICATE_THRESHOLD = 0.82
 
 _FENCE_RE = re.compile(r"^\s*(```|~~~)")
 _ORDINARY_WHITESPACE_RE = re.compile(r"[ \t]+")
+_OVERLAP_TOKEN_RE = re.compile(r"[a-z0-9]+(?:[._/-][a-z0-9]+)*")
 
 
 class DataQualityError(RuntimeError):
@@ -122,6 +126,20 @@ class ContaminationFinding:
 
 
 @dataclass(frozen=True)
+class NearDuplicateFinding:
+    left_id: str
+    right_id: str
+    similarity: float
+
+    def as_dict(self) -> dict[str, str | float]:
+        return {
+            "left_id": self.left_id,
+            "right_id": self.right_id,
+            "similarity": self.similarity,
+        }
+
+
+@dataclass(frozen=True)
 class DocumentPlan:
     documents: tuple[Document, ...]
     duplicates: DuplicateAnalysis
@@ -159,6 +177,95 @@ def normalize_document_text(text: str) -> str:
         if fence:
             in_fence = not in_fence
     return "\n".join(result)
+
+
+def normalize_overlap_text(text: str) -> tuple[str, ...]:
+    """Normalize prose for conservative near-wording comparisons.
+
+    The canonical document normalizer remains unchanged. This secondary form
+    deliberately ignores case and punctuation so cosmetic evaluation-prompt
+    rewrites cannot evade a contamination audit.
+    """
+
+    normalized = unicodedata.normalize("NFKC", normalize_document_text(text)).casefold()
+    tokens = _OVERLAP_TOKEN_RE.findall(normalized)
+    return tuple(_singular_overlap_token(token) for token in tokens)
+
+
+def near_duplicate_similarity(first: str, second: str) -> float:
+    """Return a deterministic token similarity in the inclusive range 0..1."""
+
+    left = normalize_overlap_text(first)
+    right = normalize_overlap_text(second)
+    return _near_duplicate_similarity_tokens(left, right)
+
+
+def _near_duplicate_similarity_tokens(
+    left: tuple[str, ...],
+    right: tuple[str, ...],
+) -> float:
+    if not left or not right:
+        return 0.0
+    if left == right:
+        return 1.0
+
+    sequence_ratio = SequenceMatcher(None, left, right, autojunk=False).ratio()
+    left_set = set(left)
+    right_set = set(right)
+    dice = (2.0 * len(left_set & right_set)) / (len(left_set) + len(right_set))
+    left_counts = Counter(left)
+    right_counts = Counter(right)
+    bag_dice = (
+        2.0 * sum((left_counts & right_counts).values()) / (len(left) + len(right))
+    )
+    shorter, longer = (left, right) if len(left) <= len(right) else (right, left)
+    containment = 0.0
+    if len(shorter) >= 2:
+        window = len(shorter)
+        if any(
+            tuple(longer[index : index + window]) == shorter
+            for index in range(len(longer) - window + 1)
+        ):
+            containment = 1.0
+        elif len(set(shorter) & set(longer)) / len(set(shorter)) >= 0.9:
+            containment = min(1.0, len(shorter) / max(1, len(longer)) + 0.35)
+    return round(max(sequence_ratio, dice, bag_dice, containment), 6)
+
+
+def detect_near_duplicate_texts(
+    left: Iterable[tuple[str, str]],
+    right: Iterable[tuple[str, str]] | None = None,
+    *,
+    threshold: float = NEAR_DUPLICATE_THRESHOLD,
+) -> tuple[NearDuplicateFinding, ...]:
+    """Find near-identical wording within one collection or across two collections."""
+
+    if not 0.0 < threshold <= 1.0:
+        raise ValueError("near-duplicate threshold must be in the range (0, 1]")
+    left_items = _validated_overlap_items(left, "left")
+    right_items = left_items if right is None else _validated_overlap_items(right, "right")
+    left_tokens = {
+        item_id: normalize_overlap_text(item_text) for item_id, item_text in left_items
+    }
+    right_tokens = (
+        left_tokens
+        if right is None
+        else {
+            item_id: normalize_overlap_text(item_text)
+            for item_id, item_text in right_items
+        }
+    )
+    findings: list[NearDuplicateFinding] = []
+    for left_index, (left_id, _left_text) in enumerate(left_items):
+        start = left_index + 1 if right is None else 0
+        for right_id, _right_text in right_items[start:]:
+            similarity = _near_duplicate_similarity_tokens(
+                left_tokens[left_id],
+                right_tokens[right_id],
+            )
+            if similarity >= threshold:
+                findings.append(NearDuplicateFinding(left_id, right_id, similarity))
+    return tuple(sorted(findings, key=lambda item: (item.left_id, item.right_id)))
 
 
 def create_document(
@@ -987,6 +1094,35 @@ def _conversation_record_text(
         )
     )
     return "\n".join(parts), fields
+
+
+def _singular_overlap_token(token: str) -> str:
+    if len(token) > 4 and token.endswith("ies"):
+        return token[:-3] + "y"
+    if len(token) > 4 and token.endswith("s") and not token.endswith(("ss", "us")):
+        return token[:-1]
+    return token
+
+
+def _validated_overlap_items(
+    items: Iterable[tuple[str, str]],
+    label: str,
+) -> tuple[tuple[str, str], ...]:
+    validated: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for item in items:
+        if not isinstance(item, tuple) or len(item) != 2:
+            raise ValueError(f"{label} near-duplicate items must be (ID, text) tuples")
+        item_id, text = item
+        if not isinstance(item_id, str) or not item_id.strip():
+            raise ValueError(f"{label} near-duplicate item IDs must be non-empty text")
+        if item_id in seen:
+            raise ValueError(f"duplicate {label} near-duplicate item ID: {item_id!r}")
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError(f"{label} near-duplicate text must be non-empty")
+        seen.add(item_id)
+        validated.append((item_id, text))
+    return tuple(sorted(validated))
 
 
 def _document_sort_key(document: Document) -> tuple[str, str, str]:

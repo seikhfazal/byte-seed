@@ -18,6 +18,7 @@ from .checkpoint import capture_rng_state, restore_rng_state
 from .data_quality import validate_data_quality_report
 from .eval_prompts import (
     ANCHOR_RETENTION_SUITE,
+    GENERALIZATION_HOLDOUT_SUITE,
     RUBRIC_VERSION,
     EvaluationPrompt,
     EvaluationSuite,
@@ -474,6 +475,10 @@ def _json_mapping(value: Mapping[str, Any] | None) -> dict[str, Any] | None:
 def _metric_label(suite: EvaluationSuite, contamination: Mapping[str, Any]) -> str:
     if suite.suite_id == ANCHOR_RETENTION_SUITE:
         return "Anchor-retention regression"
+    if suite.suite_id == GENERALIZATION_HOLDOUT_SUITE:
+        if contamination["status"] == "verified_clean":
+            return "Verified held-out generalization checks"
+        return "Generalization holdout candidate checks"
     if contamination["status"] == "verified_clean":
         return "Candidate held-out paraphrase checks"
     return "Candidate paraphrase checks"
